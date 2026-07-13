@@ -64,8 +64,10 @@ struct InboxView: View {
             }
 
             if realChats.isEmpty {
-                (wa.isConnected ? syncingRow : notConnectedRow)
-                    .listRowSeparator(.hidden)
+                Group {
+                    if wa.isConnected { syncingRow } else { notConnectedRow }
+                }
+                .listRowSeparator(.hidden)
             } else {
                 ForEach(realChats) { chat in
                     NavigationLink(value: chat) { ChatRow(chat: chat) }
