@@ -33,3 +33,5 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: false
+        INFOPLIST_KEY_NSCalendarsUsageDescription: "Edwin reads your calendar to know when you're free and flag scheduling in your messages."
+        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: "Edwin reads your calendar to know when you're free and flag scheduling in your messages."

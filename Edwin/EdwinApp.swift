@@ -4,15 +4,17 @@ import SwiftUI
 struct EdwinApp: App {
     @StateObject private var auth = AuthStore()
     @StateObject private var wa = WAStore()
+    @StateObject private var cal = CalendarStore()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(auth)
                 .environmentObject(wa)
+                .environmentObject(cal)
                 .tint(Theme.accent)
                 .fontDesign(.rounded)
-                .onAppear { wa.auth = auth }
+                .onAppear { wa.auth = auth; cal.auth = auth }
         }
     }
 }
