@@ -89,14 +89,14 @@ final class CalendarStore: ObservableObject {
         try? await CalendarSync.setConnection(userId: userId, connected: false, token: token)
     }
 
-    /// Pull the next 30 days of events and push them to Supabase.
+    /// Pull the next 12 months of events and push them to Supabase.
     func sync() async {
         guard connected, let token = auth?.accessToken, let userId = auth?.userId, !userId.isEmpty else { return }
         syncing = true
         defer { syncing = false }
 
         let now = Date()
-        let end = Calendar.current.date(byAdding: .day, value: 30, to: now) ?? now
+        let end = Calendar.current.date(byAdding: .month, value: 12, to: now) ?? now
         if availableCalendars.isEmpty { loadCalendars() }
         let watched: [EKCalendar]? = selectedIds.isEmpty
             ? nil  // all calendars
@@ -110,7 +110,7 @@ final class CalendarStore: ObservableObject {
         // eventIdentifier per series — suffix the start time to keep rows unique.
         var seen = Set<String>()
         var rows: [[String: Any]] = []
-        for e in events.prefix(200) {
+        for e in events.prefix(1000) {
             let baseId = e.eventIdentifier ?? UUID().uuidString
             let eventId = "\(baseId)@\(Int(e.startDate.timeIntervalSince1970))"
             guard seen.insert(eventId).inserted else { continue }  // batch must be dupe-free
