@@ -1,4 +1,5 @@
 import SwiftUI
+import EventKit
 
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthStore
@@ -6,6 +7,7 @@ struct SettingsView: View {
     @EnvironmentObject var cal: CalendarStore
     @State private var confirmSignOut = false
     @State private var showEmailSheet = false
+    @State private var showCalendarPicker = false
 
     var body: some View {
         NavigationStack {
@@ -47,7 +49,7 @@ struct SettingsView: View {
                     connectionRow(
                         icon: "calendar", tint: Theme.accent, name: "Calendar",
                         subtitle: cal.connected
-                            ? (cal.syncing ? "Syncing…" : "\(cal.eventCount) events synced")
+                            ? (cal.syncing ? "Syncing…" : "\(cal.eventCount) events · \(cal.selectionLabel)")
                             : "Let Edwin see when you're free",
                         connected: cal.connected,
                         busy: cal.syncing,
@@ -55,6 +57,26 @@ struct SettingsView: View {
                     ) {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         Task { cal.connected ? await cal.disconnect() : await cal.connect() }
+                    }
+
+                    if cal.connected {
+                        Button {
+                            cal.loadCalendars()
+                            showCalendarPicker = true
+                        } label: {
+                            HStack {
+                                Label("Choose calendars", systemImage: "checklist")
+                                    .font(.system(size: 15, design: .rounded))
+                                    .foregroundStyle(Theme.text)
+                                Spacer()
+                                Text(cal.selectionLabel)
+                                    .font(.system(size: 13, design: .rounded))
+                                    .foregroundStyle(Theme.textMuted)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Theme.textFaint)
+                            }
+                        }
                     }
 
                     connectionRow(
@@ -108,6 +130,7 @@ struct SettingsView: View {
                 }
             }
             .sheet(isPresented: $showEmailSheet) { EmailConnectSheet() }
+            .sheet(isPresented: $showCalendarPicker) { CalendarPickerSheet() }
         }
         .task {
             // keep the calendar fresh whenever settings opens
@@ -247,5 +270,62 @@ struct EmailConnectSheet: View {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.success)
             Text(text).font(.system(size: 15, design: .rounded)).foregroundStyle(Theme.text)
         }
+    }
+}
+
+
+/// Pick exactly which device calendars Edwin watches.
+struct CalendarPickerSheet: View {
+    @EnvironmentObject var cal: CalendarStore
+    @Environment(\.dismiss) var dismiss
+
+    private var grouped: [(source: String, items: [EKCalendar])] {
+        Dictionary(grouping: cal.availableCalendars, by: { $0.source.title })
+            .map { (source: $0.key, items: $0.value.sorted { $0.title < $1.title }) }
+            .sorted { $0.source < $1.source }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text("Edwin only reads events from the calendars you pick. Changes re-sync straight away.")
+                        .font(.system(size: 13, design: .rounded))
+                        .foregroundStyle(Theme.textMuted)
+                        .listRowBackground(Color.clear)
+                }
+                ForEach(grouped, id: \.source) { group in
+                    Section(group.source) {
+                        ForEach(group.items, id: \.calendarIdentifier) { c in
+                            Button {
+                                UISelectionFeedbackGenerator().selectionChanged()
+                                cal.toggle(c)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Circle()
+                                        .fill(Color(cgColor: c.cgColor ?? UIColor.systemBlue.cgColor))
+                                        .frame(width: 12, height: 12)
+                                    Text(c.title)
+                                        .font(.system(size: 16, design: .rounded))
+                                        .foregroundStyle(Theme.text)
+                                    Spacer()
+                                    Image(systemName: cal.isSelected(c) ? "checkmark.circle.fill" : "circle")
+                                        .font(.system(size: 20))
+                                        .foregroundStyle(cal.isSelected(c) ? Theme.accent : Theme.border)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Calendars")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }

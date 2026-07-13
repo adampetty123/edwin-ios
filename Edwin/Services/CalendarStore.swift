@@ -9,14 +9,52 @@ final class CalendarStore: ObservableObject {
     @Published var syncing = false
     @Published var eventCount = 0
     @Published var lastError: String?
+    @Published var availableCalendars: [EKCalendar] = []
+    @Published var selectedIds: Set<String> = []
 
     weak var auth: AuthStore?
     private let store = EKEventStore()
 
     private let connectedKey = "edwin.calendar.connected"
+    private let selectedKey = "edwin.calendar.selected"
 
     init() {
         connected = UserDefaults.standard.bool(forKey: connectedKey)
+        selectedIds = Set(UserDefaults.standard.stringArray(forKey: selectedKey) ?? [])
+        if connected { loadCalendars() }
+    }
+
+    /// All event calendars on the device. Empty selection = watch everything.
+    func loadCalendars() {
+        availableCalendars = store.calendars(for: .event)
+            .sorted { ($0.source.title, $0.title) < ($1.source.title, $1.title) }
+    }
+
+    func isSelected(_ cal: EKCalendar) -> Bool {
+        selectedIds.isEmpty || selectedIds.contains(cal.calendarIdentifier)
+    }
+
+    /// Toggle one calendar. Selection materializes from "all" on first touch.
+    func toggle(_ cal: EKCalendar) {
+        if selectedIds.isEmpty {
+            selectedIds = Set(availableCalendars.map(\.calendarIdentifier))
+        }
+        if selectedIds.contains(cal.calendarIdentifier) {
+            selectedIds.remove(cal.calendarIdentifier)
+        } else {
+            selectedIds.insert(cal.calendarIdentifier)
+        }
+        // selecting everything collapses back to "all" (new calendars auto-include)
+        if selectedIds.count == availableCalendars.count { selectedIds = [] }
+        UserDefaults.standard.set(Array(selectedIds), forKey: selectedKey)
+        Task { await sync() }
+    }
+
+    var selectionLabel: String {
+        guard connected, !availableCalendars.isEmpty else { return "" }
+        return selectedIds.isEmpty
+            ? "All \(availableCalendars.count) calendars"
+            : "\(selectedIds.count) of \(availableCalendars.count) calendars"
     }
 
     /// Ask for calendar access, then do a first sync.
@@ -35,6 +73,7 @@ final class CalendarStore: ObservableObject {
             }
             connected = true
             UserDefaults.standard.set(true, forKey: connectedKey)
+            loadCalendars()
             await sync()
         } catch {
             lastError = "Couldn't connect calendar: \(error.localizedDescription)"
@@ -58,7 +97,11 @@ final class CalendarStore: ObservableObject {
 
         let now = Date()
         let end = Calendar.current.date(byAdding: .day, value: 30, to: now) ?? now
-        let predicate = store.predicateForEvents(withStart: now, end: end, calendars: nil)
+        if availableCalendars.isEmpty { loadCalendars() }
+        let watched: [EKCalendar]? = selectedIds.isEmpty
+            ? nil  // all calendars
+            : availableCalendars.filter { selectedIds.contains($0.calendarIdentifier) }
+        let predicate = store.predicateForEvents(withStart: now, end: end, calendars: watched)
         let events = store.events(matching: predicate)
 
         let iso = ISO8601DateFormatter()
