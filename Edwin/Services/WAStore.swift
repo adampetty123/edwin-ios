@@ -40,6 +40,16 @@ final class WAStore: ObservableObject {
         }
     }
 
+    /// One newest matching message per chat, for the inbox search results.
+    func searchMessages(_ query: String) async -> [WAMessage] {
+        guard let token else { return [] }
+        guard let hits = try? await WAClient.searchMessages(query: query, token: token) else { return [] }
+        var seen = Set<String>()
+        var out: [WAMessage] = []
+        for m in hits where seen.insert(m.chatJid).inserted { out.append(m) }
+        return out
+    }
+
     func refreshMessages(chatJid: String) async {
         guard let token else { return }
         if let m = try? await WAClient.messages(chatJid: chatJid, token: token), m != messages[chatJid] {

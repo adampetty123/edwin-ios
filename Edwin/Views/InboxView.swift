@@ -4,13 +4,46 @@ struct InboxView: View {
     @EnvironmentObject var auth: AuthStore
     @EnvironmentObject var wa: WAStore
 
+    @State private var search = ""
+    @State private var messageHits: [WAMessage] = []
+    @State private var searchTask: Task<Void, Never>?
+
     private var realChats: [WAChat] { wa.chats.filter { !$0.assistant } }
+    private var searching: Bool { !search.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    /// Chats whose name or last message matches the query.
+    private var chatMatches: [WAChat] {
+        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return realChats }
+        return realChats.filter {
+            $0.displayName.lowercased().contains(q)
+            || ($0.lastMessageText?.lowercased().contains(q) ?? false)
+        }
+    }
+
+    /// Message hits whose chat isn't already covered by a name/preview match.
+    private var extraMessageHits: [WAMessage] {
+        let covered = Set(chatMatches.map(\.jid))
+        return messageHits.filter { !covered.contains($0.chatJid) }
+    }
 
     var body: some View {
         NavigationStack {
             list
             .background(Theme.bg)
             .navigationTitle("Inbox")
+            .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search chats and messages")
+            .onChange(of: search) {
+                let q = search
+                searchTask?.cancel()
+                guard q.trimmingCharacters(in: .whitespaces).count >= 2 else { messageHits = []; return }
+                searchTask = Task {
+                    try? await Task.sleep(nanoseconds: 300_000_000)  // debounce
+                    guard !Task.isCancelled else { return }
+                    let hits = await wa.searchMessages(q)
+                    if !Task.isCancelled { messageHits = hits }
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Text(greeting)
@@ -35,6 +68,8 @@ struct InboxView: View {
         }
     }
 
+    private func chat(for jid: String) -> WAChat? { wa.chats.first { $0.jid == jid } }
+
     // live connection status — the bridge is always visible, never magic
     private var statusChip: some View {
         HStack(spacing: 5) {
@@ -51,33 +86,73 @@ struct InboxView: View {
         .accessibilityLabel(wa.isConnected ? "WhatsApp connected" : "WhatsApp offline")
     }
 
+    @ViewBuilder
     private var list: some View {
-        List {
-            // Edwin is always pinned at the very top
-            if let edwin = wa.assistantChat {
-                NavigationLink(value: edwin) {
-                    AssistantRow(chat: edwin, draftCount: wa.drafts.count)
+        if searching {
+            searchResults
+        } else {
+            List {
+                // Edwin is always pinned at the very top
+                if let edwin = wa.assistantChat {
+                    NavigationLink(value: edwin) {
+                        AssistantRow(chat: edwin, draftCount: wa.drafts.count)
+                    }
+                    .listRowInsets(EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20))
+                    .listRowSeparatorTint(Theme.border)
+                    .listRowBackground(Theme.accentSoft.opacity(0.35))
                 }
-                .listRowInsets(EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20))
-                .listRowSeparatorTint(Theme.border)
-                .listRowBackground(Theme.accentSoft.opacity(0.35))
-            }
 
-            if realChats.isEmpty {
-                Group {
-                    if wa.isConnected { syncingRow } else { notConnectedRow }
+                if realChats.isEmpty {
+                    Group {
+                        if wa.isConnected { syncingRow } else { notConnectedRow }
+                    }
+                    .listRowSeparator(.hidden)
+                } else {
+                    ForEach(realChats) { chat in
+                        NavigationLink(value: chat) { ChatRow(chat: chat) }
+                            .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
+                            .listRowSeparatorTint(Theme.border)
+                    }
                 }
-                .listRowSeparator(.hidden)
-            } else {
-                ForEach(realChats) { chat in
-                    NavigationLink(value: chat) { ChatRow(chat: chat) }
-                        .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
-                        .listRowSeparatorTint(Theme.border)
+            }
+            .listStyle(.plain)
+            .refreshable { await wa.refreshChats() }
+        }
+    }
+
+    private var searchResults: some View {
+        List {
+            if !chatMatches.isEmpty {
+                Section("Chats") {
+                    ForEach(chatMatches) { chat in
+                        NavigationLink(value: chat) { ChatRow(chat: chat) }
+                            .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
+                    }
                 }
+            }
+            if !extraMessageHits.isEmpty {
+                Section("Messages") {
+                    ForEach(extraMessageHits) { hit in
+                        if let c = chat(for: hit.chatJid) {
+                            NavigationLink(value: c) {
+                                MessageHitRow(chat: c, hit: hit, query: search)
+                            }
+                            .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
+                        }
+                    }
+                }
+            }
+            if chatMatches.isEmpty && extraMessageHits.isEmpty {
+                Text(search.trimmingCharacters(in: .whitespaces).count < 2
+                     ? "Keep typing to search…"
+                     : "No matches for “\(search)”.")
+                    .font(.system(size: 15, design: .rounded))
+                    .foregroundStyle(Theme.textMuted)
+                    .frame(maxWidth: .infinity).padding(.vertical, 30)
+                    .listRowSeparator(.hidden)
             }
         }
         .listStyle(.plain)
-        .refreshable { await wa.refreshChats() }
     }
 
     private var notConnectedRow: some View {
@@ -219,6 +294,56 @@ struct ChatRow: View {
 
 extension WAChat: Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(jid) }
+}
+
+/// A message-search hit: chat name + the matching line with the term emphasized.
+struct MessageHitRow: View {
+    let chat: WAChat
+    let hit: WAMessage
+    let query: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            avatar
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Text(chat.displayName)
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Theme.text)
+                        .lineLimit(1)
+                    Spacer()
+                    Text(hit.ts.formatted(.dateTime.day().month(.abbreviated)))
+                        .font(.system(size: 12, design: .rounded))
+                        .foregroundStyle(Theme.textFaint)
+                }
+                Text(highlighted)
+                    .font(.system(size: 14, design: .rounded))
+                    .foregroundStyle(Theme.textMuted)
+                    .lineLimit(2)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var highlighted: AttributedString {
+        var s = AttributedString((hit.senderName.map { $0 == "You" ? "You: " : "\($0): " } ?? "") + hit.text)
+        if let r = s.range(of: query, options: .caseInsensitive) {
+            s[r].foregroundColor = Theme.accent
+            s[r].font = .system(size: 14, weight: .bold, design: .rounded)
+        }
+        return s
+    }
+
+    private var avatar: some View {
+        Circle()
+            .fill(Theme.surfaceAlt)
+            .frame(width: 40, height: 40)
+            .overlay(Text(initials).font(.system(size: 14, weight: .bold, design: .rounded)).foregroundStyle(Theme.textMuted))
+    }
+
+    private var initials: String {
+        chat.displayName.split(separator: " ").prefix(2).compactMap { $0.first.map(String.init) }.joined().uppercased()
+    }
 }
 
 /// The pinned Edwin row — visually distinct from real contacts.

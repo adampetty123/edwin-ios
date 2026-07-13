@@ -142,6 +142,18 @@ enum WAClient {
         return try decoder.decode([WAChat].self, from: data)
     }
 
+    /// Full-text-ish search across message bodies; returns the newest hit per chat.
+    static func searchMessages(query: String, token: String) async throws -> [WAMessage] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard q.count >= 2 else { return [] }
+        let enc = "*\(q)*".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q
+        let data = try await request(
+            "GET",
+            "/wa_messages?select=*&chat_jid=neq.assistant@edwin&text=ilike.\(enc)&order=ts.desc&limit=80",
+            token: token)
+        return try decoder.decode([WAMessage].self, from: data)
+    }
+
     static func messages(chatJid: String, token: String) async throws -> [WAMessage] {
         let jid = chatJid.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? chatJid
         let data = try await request("GET", "/wa_messages?select=*&chat_jid=eq.\(jid)&order=ts.desc&limit=200", token: token)
