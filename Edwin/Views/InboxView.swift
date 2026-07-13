@@ -186,10 +186,10 @@ struct ChatRow: View {
             }
             .frame(width: 48, height: 48)
             .clipShape(Circle())
-            Circle()
-                .fill(Theme.whatsapp)
+            Image("WhatsAppBadge")
+                .resizable()
                 .frame(width: 18, height: 18)
-                .overlay(Image(systemName: "message.fill").font(.system(size: 8)).foregroundStyle(.white))
+                .background(Circle().fill(.white))
                 .overlay(Circle().stroke(Theme.bg, lineWidth: 2))
                 .offset(x: 2, y: 2)
         }
