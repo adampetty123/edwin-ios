@@ -83,6 +83,26 @@ enum SupabaseAuthClient {
         ])
     }
 
+    /// Native Sign in with Apple: exchange Apple's identity token for a Supabase session.
+    static func signInWithApple(idToken: String, nonce: String) async throws -> AuthSession {
+        try await post("token?grant_type=id_token", body: [
+            "provider": "apple",
+            "id_token": idToken,
+            "nonce": nonce,
+        ])
+    }
+
+    /// Set user_metadata.name (Apple only shares the name on first sign-in).
+    static func updateName(_ name: String, accessToken: String) async {
+        var req = URLRequest(url: URL(string: baseURL.absoluteString + "/user")!)
+        req.httpMethod = "PUT"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["data": ["name": name]])
+        _ = try? await URLSession.shared.data(for: req)
+    }
+
     static func refresh(refreshToken: String) async throws -> AuthSession {
         try await post("token?grant_type=refresh_token", body: ["refresh_token": refreshToken])
     }

@@ -11,6 +11,10 @@ targets:
     platform: iOS
     sources:
       - Edwin
+    entitlements:
+      path: Edwin/Edwin.entitlements
+      properties:
+        com.apple.developer.applesignin: [Default]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.flowjam.iris

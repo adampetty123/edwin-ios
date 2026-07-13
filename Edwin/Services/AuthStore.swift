@@ -57,6 +57,18 @@ final class AuthStore: ObservableObject {
         apply(session)
     }
 
+    func signInWithApple(idToken: String, nonce: String, fullName: String?) async throws {
+        let session = try await SupabaseAuthClient.signInWithApple(idToken: idToken, nonce: nonce)
+        apply(session)
+        // Apple only shares the name on the very first authorization — persist it.
+        let existing = (session.user.userMetadata?["name"]?.value as? String) ?? ""
+        if let fullName, !fullName.isEmpty, existing.isEmpty {
+            await SupabaseAuthClient.updateName(fullName, accessToken: session.accessToken)
+            userName = fullName
+            UserDefaults.standard.set(fullName, forKey: Keys.name)
+        }
+    }
+
     func signOut() async {
         if let token = accessToken {
             await SupabaseAuthClient.signOut(accessToken: token)

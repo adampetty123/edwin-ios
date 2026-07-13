@@ -43,6 +43,9 @@ struct SignUpView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(busy)
+
+            OrDivider().padding(.vertical, 2)
+            AppleSignInButton(error: $error, label: .signUp)
         }
     }
 
@@ -97,6 +100,9 @@ struct SignInView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(busy)
+
+            OrDivider().padding(.vertical, 2)
+            AppleSignInButton(error: $error, label: .signIn)
         }
     }
 

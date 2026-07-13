@@ -4,6 +4,7 @@ struct WelcomeView: View {
     @State private var showSignUp = false
     @State private var showSignIn = false
     @State private var appeared = false
+    @State private var appleError: String?
 
     var body: some View {
         NavigationStack {
@@ -36,6 +37,8 @@ struct WelcomeView: View {
                 Spacer()
 
                 VStack(spacing: 10) {
+                    AppleSignInButton(error: $appleError)
+
                     Button {
                         showSignUp = true
                     } label: {
@@ -43,6 +46,12 @@ struct WelcomeView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(PrimaryButtonStyle())
+
+                    if let appleError {
+                        Text(appleError)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.danger)
+                    }
 
                     Button("I already have an account") {
                         showSignIn = true
