@@ -78,6 +78,17 @@ jobs:
             | tail -20
           ls -la build/export
 
+      - name: Verify signed entitlements
+        run: |
+          cd build/export
+          unzip -q *.ipa -d ipa-check
+          echo "=== entitlements in signed app ==="
+          codesign -d --entitlements :- ipa-check/Payload/*.app
+          codesign -d --entitlements :- ipa-check/Payload/*.app 2>/dev/null | grep -q applesignin \
+            && echo "OK: applesignin entitlement present" \
+            || { echo "FAIL: applesignin entitlement MISSING"; exit 1; }
+          rm -rf ipa-check
+
       - name: Upload to TestFlight
         env:
           ASC_KEY_B64: ${{ secrets.ASC_API_KEY_B64 }}

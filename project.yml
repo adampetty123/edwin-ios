@@ -22,6 +22,7 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         DEVELOPMENT_TEAM: Z3FSAXK2G4
         CODE_SIGN_STYLE: Manual
+        CODE_SIGN_ENTITLEMENTS: Edwin/Edwin.entitlements
         PROVISIONING_PROFILE_SPECIFIER: "Iris App Store"
         CODE_SIGN_IDENTITY: "Apple Distribution"
         TARGETED_DEVICE_FAMILY: "1"
