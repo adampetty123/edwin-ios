@@ -13,7 +13,8 @@ final class AuthStore: ObservableObject {
     @Published var imessageConnected = false
     @Published var onboardingDone = false
 
-    private var accessToken: String?
+    private(set) var accessToken: String?
+    @Published var userId: String = ""
 
     var onboarded: Bool { onboardingDone || whatsappConnected || imessageConnected }
 
@@ -83,6 +84,7 @@ final class AuthStore: ObservableObject {
 
     private func apply(_ session: AuthSession) {
         accessToken = session.accessToken
+        userId = session.user.id
         userName = session.user.displayName
         userEmail = session.user.email ?? ""
         isAuthed = true

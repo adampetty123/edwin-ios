@@ -7,18 +7,7 @@ struct OnboardingFlow: View {
         NavigationStack {
             Group {
                 if step == 0 {
-                    ConnectChannelView(
-                        channel: .whatsapp,
-                        icon: "message.fill",
-                        tint: Theme.whatsapp,
-                        name: "WhatsApp",
-                        headline: "Never miss the one that matters.",
-                        benefit: "Edwin reads every group and DM, floats the chats that actually need you, and lets the rest settle.",
-                        bullets: [
-                            "Every chat in one place",
-                            "The 200-message group chat, in a line",
-                            "Replies written, waiting on your ok",
-                        ],
+                    ConnectWhatsAppView(
                         stepIndex: 0,
                         onDone: { step = 1 },
                         onSkip: { step = 1 }

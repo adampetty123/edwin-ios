@@ -3,13 +3,16 @@ import SwiftUI
 @main
 struct EdwinApp: App {
     @StateObject private var auth = AuthStore()
+    @StateObject private var wa = WAStore()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(auth)
+                .environmentObject(wa)
                 .tint(Theme.accent)
                 .fontDesign(.rounded)
+                .onAppear { wa.auth = auth }
         }
     }
 }
