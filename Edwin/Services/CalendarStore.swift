@@ -62,17 +62,24 @@ final class CalendarStore: ObservableObject {
         let events = store.events(matching: predicate)
 
         let iso = ISO8601DateFormatter()
-        let rows: [[String: Any]] = events.prefix(200).map { e in
-            var row: [String: Any] = [
+        // PostgREST bulk inserts require identical keys on every row, so always
+        // send the full column set (NSNull for gaps). Recurring events reuse one
+        // eventIdentifier per series — suffix the start time to keep rows unique.
+        var seen = Set<String>()
+        var rows: [[String: Any]] = []
+        for e in events.prefix(200) {
+            let baseId = e.eventIdentifier ?? UUID().uuidString
+            let eventId = "\(baseId)@\(Int(e.startDate.timeIntervalSince1970))"
+            guard seen.insert(eventId).inserted else { continue }  // batch must be dupe-free
+            rows.append([
                 "user_id": userId,
-                "event_id": e.eventIdentifier ?? UUID().uuidString,
+                "event_id": eventId,
                 "title": e.title ?? "(busy)",
                 "starts_at": iso.string(from: e.startDate),
+                "ends_at": e.endDate.map { iso.string(from: $0) } ?? NSNull(),
+                "location": (e.location?.isEmpty == false ? e.location! : NSNull()) as Any,
                 "all_day": e.isAllDay,
-            ]
-            if let ed = e.endDate { row["ends_at"] = iso.string(from: ed) }
-            if let loc = e.location, !loc.isEmpty { row["location"] = loc }
-            return row
+            ])
         }
         do {
             try await CalendarSync.replace(userId: userId, rows: rows, token: token)
@@ -101,12 +108,13 @@ enum CalendarSync {
         }
     }
 
-    /// Replace the user's synced window: clear then insert.
+    /// Replace the user's synced window: clear then upsert (tolerates dupes).
     static func replace(userId: String, rows: [[String: Any]], token: String) async throws {
         try await clear(userId: userId, token: token)
         guard !rows.isEmpty else { return }
         for chunk in stride(from: 0, to: rows.count, by: 100).map({ Array(rows[$0..<min($0+100, rows.count)]) }) {
-            try await req("POST", "/assistant_calendar", token: token, body: chunk, prefer: "return=minimal")
+            try await req("POST", "/assistant_calendar?on_conflict=user_id,event_id", token: token,
+                          body: chunk, prefer: "resolution=merge-duplicates,return=minimal")
         }
     }
 
