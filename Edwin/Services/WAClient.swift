@@ -200,16 +200,34 @@ enum WAClient {
     }
 
     /// Owner speaks to Edwin: echo their message instantly, then queue the job.
-    static func sendToAssistant(userId: String, text: String, token: String) async throws {
+    static func sendToAssistant(userId: String, text: String, mediaUrl: String? = nil, mediaType: String? = nil, token: String) async throws {
         let mid = "user-\(Int(Date().timeIntervalSince1970 * 1000))"
+        var msg: [String: Any] = ["user_id": userId, "chat_jid": assistantJid, "msg_id": mid,
+                                  "sender_jid": "me", "sender_name": "You", "from_me": true,
+                                  "text": text.isEmpty ? "[photo]" : text, "ts": iso(Date())]
+        if let mediaUrl { msg["media_url"] = mediaUrl; msg["media_type"] = mediaType ?? "image" }
         _ = try await request("POST", "/wa_messages", token: token,
-            body: [["user_id": userId, "chat_jid": assistantJid, "msg_id": mid,
-                    "sender_jid": "me", "sender_name": "You", "from_me": true,
-                    "text": text, "ts": iso(Date())]],
-            prefer: "resolution=ignore-duplicates,return=minimal")
+            body: [msg], prefer: "resolution=ignore-duplicates,return=minimal")
+        let jobText = mediaUrl != nil ? "\(text)\n[attached image: \(mediaUrl!)]" : text
         _ = try await request("POST", "/wa_outbox", token: token,
-            body: [["user_id": userId, "chat_jid": assistantJid, "text": text, "kind": "assistant"]],
+            body: [["user_id": userId, "chat_jid": assistantJid, "text": jobText, "kind": "assistant"]],
             prefer: "return=minimal")
+    }
+
+    /// Upload an attachment to storage; returns its public URL.
+    static func uploadAttachment(userId: String, data: Data, ext: String, mime: String, token: String) async throws -> String {
+        let path = "\(userId)/assistant/\(Int(Date().timeIntervalSince1970 * 1000)).\(ext)"
+        var req = URLRequest(url: URL(string: "https://cchnsizaeoqhgawkyugs.supabase.co/storage/v1/object/wa-media/\(path)")!)
+        req.httpMethod = "POST"
+        req.setValue(SupabaseAuthClient.anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue(mime, forHTTPHeaderField: "Content-Type")
+        req.httpBody = data
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, http.statusCode < 400 else {
+            throw AuthError.server("Upload failed (\((resp as? HTTPURLResponse)?.statusCode ?? 0)).")
+        }
+        return "https://cchnsizaeoqhgawkyugs.supabase.co/storage/v1/object/public/wa-media/\(path)"
     }
 
     static func clearAssistantUnread(userId: String, token: String) async throws {

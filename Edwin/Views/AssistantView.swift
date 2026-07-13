@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 /// The pinned chat with Edwin, your assistant. Same bubble language as a real
 /// chat, but replies stay internal and Edwin's drafts surface as approve cards.
@@ -8,6 +9,8 @@ struct AssistantChatView: View {
 
     @State private var draft = ""
     @State private var thinking = false
+    @State private var pickedItem: PhotosPickerItem?
+    @State private var pickedImage: Data?
 
     private var msgs: [WAMessage] { wa.messages[WAClient.assistantJid] ?? [] }
 
@@ -43,6 +46,7 @@ struct AssistantChatView: View {
         .background(Theme.bg)
         .navigationTitle("Edwin")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 8) {
                 if !wa.drafts.isEmpty {
@@ -73,7 +77,44 @@ struct AssistantChatView: View {
     }
 
     private var composer: some View {
+        VStack(spacing: 6) {
+            if let data = pickedImage, let ui = UIImage(data: data) {
+                HStack {
+                    Image(uiImage: ui)
+                        .resizable().scaledToFill()
+                        .frame(width: 56, height: 56)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    Text("Attached").font(.system(size: 13, design: .rounded)).foregroundStyle(Theme.textMuted)
+                    Spacer()
+                    Button { pickedImage = nil; pickedItem = nil } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.textFaint)
+                    }
+                }
+                .padding(.horizontal, 12)
+            }
+            composerBar
+        }
+    }
+
+    private var composerBar: some View {
         HStack(spacing: 10) {
+            PhotosPicker(selection: $pickedItem, matching: .images) {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.textMuted)
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(Theme.surface))
+            }
+            .onChange(of: pickedItem) {
+                Task {
+                    if let item = pickedItem,
+                       let data = try? await item.loadTransferable(type: Data.self),
+                       let ui = UIImage(data: data) {
+                        // recompress to keep uploads light
+                        pickedImage = ui.jpegData(compressionQuality: 0.75)
+                    }
+                }
+            }
             TextField("Message Edwin", text: $draft, axis: .vertical)
                 .font(.system(size: 16, design: .rounded))
                 .lineLimit(1...4)
@@ -85,9 +126,9 @@ struct AssistantChatView: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 38, height: 38)
-                    .background(Circle().fill(draft.trimmingCharacters(in: .whitespaces).isEmpty ? Theme.border : Theme.accent))
+                    .background(Circle().fill(draft.trimmingCharacters(in: .whitespaces).isEmpty && pickedImage == nil ? Theme.border : Theme.accent))
             }
-            .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
+            .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty && pickedImage == nil)
             .accessibilityLabel("Send")
         }
         .padding(.horizontal, 12).padding(.bottom, 8)
@@ -95,11 +136,14 @@ struct AssistantChatView: View {
 
     private func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        let image = pickedImage
+        guard !text.isEmpty || image != nil else { return }
         draft = ""
+        pickedImage = nil
+        pickedItem = nil
         thinking = true
         Task {
-            try? await wa.sendToAssistant(text: text)
+            try? await wa.sendToAssistant(text: text, imageData: image)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             await wa.refreshMessages(chatJid: WAClient.assistantJid)
         }

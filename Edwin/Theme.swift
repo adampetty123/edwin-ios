@@ -19,6 +19,10 @@ enum Theme {
 
     // channels (functional wayfinding)
     static let whatsapp = Color(hex: 0x25D366)
+
+    // chat bubbles — iMessage language
+    static let bubbleMe = Color(hex: 0x007AFF)
+    static let bubbleThem = Color(hex: 0xE9E9EB)
     static let imessage = Color(hex: 0x0A84FF)
 
     // status

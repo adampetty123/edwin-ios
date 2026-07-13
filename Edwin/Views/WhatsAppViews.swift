@@ -298,6 +298,7 @@ struct ChatView: View {
         .background(Theme.bg)
         .navigationTitle(chat.displayName)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom) { composer }
         .task {
             await wa.markRead(chatJid: chat.jid)
@@ -443,10 +444,26 @@ struct MessageBubble: View {
                         .offset(y: -6)
                         .padding(.bottom, -6)
                 }
+                meta
             }
             if !message.fromMe { Spacer(minLength: 48) }
         }
         .frame(maxWidth: .infinity, alignment: message.fromMe ? .trailing : .leading)
+    }
+
+    /// Time + read receipt live under the bubble, hugging its edge — like iMessage.
+    private var meta: some View {
+        HStack(spacing: 3) {
+            Text(message.ts.formatted(date: .omitted, time: .shortened))
+                .font(.system(size: 10.5, design: .rounded))
+            if message.fromMe {
+                Image(systemName: ticksIcon)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(message.status == "read" ? Theme.bubbleMe : Theme.textFaint)
+            }
+        }
+        .foregroundStyle(Theme.textFaint)
+        .padding(.horizontal, 4)
     }
 
     private var bubble: some View {
@@ -480,20 +497,9 @@ struct MessageBubble: View {
                     .font(.system(size: 16, design: .rounded))
                     .foregroundStyle(message.fromMe ? .white : Theme.text)
             }
-            HStack(spacing: 3) {
-                Text(message.ts.formatted(date: .omitted, time: .shortened))
-                    .font(.system(size: 10.5, design: .rounded))
-                if message.fromMe {
-                    Image(systemName: ticksIcon)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(message.status == "read" ? Color(hex: 0x8AD7FF) : .white.opacity(0.7))
-                }
-            }
-            .foregroundStyle(message.fromMe ? .white.opacity(0.7) : Theme.textFaint)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 16).fill(message.fromMe ? Theme.accent : Theme.surface))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(message.fromMe ? .clear : Theme.border, lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 18).fill(message.fromMe ? Theme.bubbleMe : Theme.bubbleThem))
     }
 
     private var showText: Bool {

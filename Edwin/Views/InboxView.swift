@@ -228,7 +228,7 @@ struct AssistantRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            RoundedRectangle(cornerRadius: 14)
+            Circle()
                 .fill(Theme.accent)
                 .frame(width: 48, height: 48)
                 .overlay(
