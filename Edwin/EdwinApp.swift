@@ -9,6 +9,7 @@ struct EdwinApp: App {
             RootView()
                 .environmentObject(auth)
                 .tint(Theme.accent)
+                .fontDesign(.rounded)
         }
     }
 }

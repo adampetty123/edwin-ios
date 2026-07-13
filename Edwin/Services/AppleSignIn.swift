@@ -67,9 +67,9 @@ struct AppleSignInButton: View {
             }
         }
         .signInWithAppleButtonStyle(.black)
-        .frame(height: 52)
+        .frame(height: 56)
         .frame(maxWidth: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 50))
         .accessibilityLabel("Continue with Apple")
     }
 }
@@ -80,7 +80,7 @@ struct OrDivider: View {
         HStack(spacing: 12) {
             Rectangle().fill(Theme.border).frame(height: 1)
             Text("or")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(Theme.textMuted)
             Rectangle().fill(Theme.border).frame(height: 1)
         }

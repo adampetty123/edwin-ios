@@ -84,16 +84,16 @@ struct ConnectChannelView: View {
                 .padding(.bottom, 24)
 
             Text("CONNECT \(name.uppercased())")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .kerning(0.5)
                 .foregroundStyle(Theme.accent)
                 .padding(.bottom, 8)
             Text(headline)
-                .font(.system(size: 32, weight: .heavy))
+                .font(.system(size: 32, weight: .heavy, design: .rounded))
                 .foregroundStyle(Theme.text)
                 .padding(.bottom, 10)
             Text(benefit)
-                .font(.system(size: 16))
+                .font(.system(size: 16, design: .rounded))
                 .foregroundStyle(Theme.textMuted)
                 .lineSpacing(4)
 
@@ -103,7 +103,7 @@ struct ConnectChannelView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(tint)
                         Text(b)
-                            .font(.system(size: 16))
+                            .font(.system(size: 16, design: .rounded))
                             .foregroundStyle(Theme.text)
                     }
                 }
@@ -132,7 +132,7 @@ struct ConnectChannelView: View {
             Spacer()
             if status != .done {
                 Button("Skip", action: onSkip)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(Theme.textMuted)
             }
         }
@@ -144,12 +144,12 @@ struct ConnectChannelView: View {
             RoundedRectangle(cornerRadius: 18)
                 .fill(tint.opacity(0.1))
                 .frame(width: 80, height: 80)
-                .overlay(Image(systemName: icon).font(.system(size: 36)).foregroundStyle(tint))
+                .overlay(Image(systemName: icon).font(.system(size: 36, design: .rounded)).foregroundStyle(tint))
             if status == .done {
                 Circle()
                     .fill(Theme.success)
                     .frame(width: 28, height: 28)
-                    .overlay(Image(systemName: "checkmark").font(.system(size: 13, weight: .bold)).foregroundStyle(.white))
+                    .overlay(Image(systemName: "checkmark").font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(.white))
                     .overlay(Circle().stroke(Theme.bg, lineWidth: 3))
                     .offset(x: 6, y: 6)
                     .transition(.scale.combined(with: .opacity))
@@ -163,7 +163,7 @@ struct ConnectChannelView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Theme.danger)
                     Text("That one didn't land. Give it another go?")
-                        .font(.system(size: 13))
+                        .font(.system(size: 13, design: .rounded))
                         .foregroundStyle(Theme.danger)
                 }
             }
@@ -187,7 +187,7 @@ struct ConnectChannelView: View {
             .disabled(status == .connecting || status == .done)
 
             Text("Edwin only reads to sort. Nothing sends without your say-so.")
-                .font(.system(size: 13))
+                .font(.system(size: 13, design: .rounded))
                 .foregroundStyle(Theme.textFaint)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)

@@ -133,14 +133,14 @@ struct AuthFormScaffold<Fields: View, Footer: View>: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
                 Text(eyebrow)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .kerning(0.5)
                     .foregroundStyle(Theme.accent)
                 Text(title)
-                    .font(.system(size: 34, weight: .heavy))
+                    .font(.system(size: 34, weight: .heavy, design: .rounded))
                     .foregroundStyle(Theme.text)
                 Text(subtitle)
-                    .font(.system(size: 16))
+                    .font(.system(size: 16, design: .rounded))
                     .foregroundStyle(Theme.textMuted)
 
                 VStack(spacing: 16) { fields }
@@ -170,7 +170,7 @@ struct LabeledField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(Theme.textMuted)
             Group {
                 if secure {
@@ -179,7 +179,7 @@ struct LabeledField: View {
                     TextField(placeholder, text: $text)
                 }
             }
-            .font(.system(size: 16))
+            .font(.system(size: 16, design: .rounded))
             .padding(.horizontal, 16)
             .frame(height: 52)
             .background(RoundedRectangle(cornerRadius: 12).fill(Theme.surface))
@@ -189,7 +189,7 @@ struct LabeledField: View {
             )
             if let error {
                 Text(error)
-                    .font(.system(size: 13))
+                    .font(.system(size: 13, design: .rounded))
                     .foregroundStyle(Theme.danger)
                     .accessibilityLabel("Error: \(error)")
             }

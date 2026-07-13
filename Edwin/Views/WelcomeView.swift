@@ -18,15 +18,15 @@ struct WelcomeView: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("YOUR MESSAGES, HANDLED")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .kerning(0.5)
                         .foregroundStyle(Theme.accent)
                     Text("Read less.\nMiss nothing.")
-                        .font(.system(size: 38, weight: .heavy))
+                        .font(.system(size: 38, weight: .heavy, design: .rounded))
                         .foregroundStyle(Theme.text)
                         .lineSpacing(2)
                     Text("Edwin reads every WhatsApp and iMessage thread, surfaces what needs you, and drafts the rest. Nothing sends without you.")
-                        .font(.system(size: 16))
+                        .font(.system(size: 16, design: .rounded))
                         .foregroundStyle(Theme.textMuted)
                         .lineSpacing(4)
                 }
@@ -49,14 +49,14 @@ struct WelcomeView: View {
 
                     if let appleError {
                         Text(appleError)
-                            .font(.system(size: 13))
+                            .font(.system(size: 13, design: .rounded))
                             .foregroundStyle(Theme.danger)
                     }
 
                     Button("I already have an account") {
                         showSignIn = true
                     }
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(Theme.accent)
                     .padding(.vertical, 10)
                 }
@@ -81,7 +81,7 @@ struct WelcomeView: View {
                 .frame(width: 44, height: 44)
                 .overlay(
                     Text("e")
-                        .font(.system(size: 26, weight: .heavy))
+                        .font(.system(size: 26, weight: .heavy, design: .rounded))
                         .foregroundStyle(.white)
                         .offset(y: -1)
                 )
@@ -96,8 +96,8 @@ struct WelcomeView: View {
 
     private func channelChip(icon: String, label: String, color: Color, bg: Color) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: icon).font(.system(size: 11))
-            Text(label).font(.system(size: 11, weight: .bold)).kerning(0.3)
+            Image(systemName: icon).font(.system(size: 11, design: .rounded))
+            Text(label).font(.system(size: 11, weight: .bold, design: .rounded)).kerning(0.3)
         }
         .foregroundStyle(color)
         .padding(.horizontal, 12)
@@ -139,11 +139,11 @@ struct HeroFlow: View {
                     .frame(width: 22, height: 22)
                     .overlay(
                         Text("e")
-                            .font(.system(size: 14, weight: .heavy))
+                            .font(.system(size: 14, weight: .heavy, design: .rounded))
                             .foregroundStyle(Theme.accent)
                     )
                 Text("One inbox")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
             }
             .padding(.horizontal, 16)
@@ -170,10 +170,10 @@ struct HeroFlow: View {
             Circle()
                 .fill(c.color)
                 .frame(width: 26, height: 26)
-                .overlay(Image(systemName: c.icon).font(.system(size: 11)).foregroundStyle(.white))
+                .overlay(Image(systemName: c.icon).font(.system(size: 11, design: .rounded)).foregroundStyle(.white))
             VStack(alignment: .leading, spacing: 1) {
-                Text(c.name).font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.text)
-                Text(c.text).font(.system(size: 12.5)).foregroundStyle(Theme.textMuted)
+                Text(c.name).font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(Theme.text)
+                Text(c.text).font(.system(size: 12.5, design: .rounded)).foregroundStyle(Theme.textMuted)
             }
             Spacer(minLength: 0)
         }
@@ -193,11 +193,11 @@ struct PrimaryButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 16, weight: .semibold))
+            .font(.system(size: 16, weight: .semibold, design: .rounded))
             .foregroundStyle(.white)
-            .frame(height: 52)
+            .frame(height: 56)
             .frame(maxWidth: .infinity)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Theme.accent))
+            .background(RoundedRectangle(cornerRadius: 50).fill(Theme.accent))
             .opacity(configuration.isPressed ? 0.85 : 1)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)

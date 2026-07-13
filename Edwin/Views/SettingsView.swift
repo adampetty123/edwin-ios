@@ -14,15 +14,15 @@ struct SettingsView: View {
                             .frame(width: 52, height: 52)
                             .overlay(
                                 Text(String(auth.userName.prefix(1)).uppercased())
-                                    .font(.system(size: 22, weight: .bold))
+                                    .font(.system(size: 22, weight: .bold, design: .rounded))
                                     .foregroundStyle(.white)
                             )
                         VStack(alignment: .leading, spacing: 2) {
                             Text(auth.userName.isEmpty ? "You" : auth.userName)
-                                .font(.system(size: 18, weight: .bold))
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
                                 .foregroundStyle(Theme.text)
                             Text(auth.userEmail)
-                                .font(.system(size: 13))
+                                .font(.system(size: 13, design: .rounded))
                                 .foregroundStyle(Theme.textMuted)
                         }
                     }
@@ -51,7 +51,7 @@ struct SettingsView: View {
                         Label("Assistant", systemImage: "wand.and.stars")
                         Spacer()
                         Text("Approve sends")
-                            .font(.system(size: 13))
+                            .font(.system(size: 13, design: .rounded))
                             .foregroundStyle(Theme.textMuted)
                     }
                 }
@@ -82,19 +82,19 @@ struct SettingsView: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(tint.opacity(0.12))
                 .frame(width: 40, height: 40)
-                .overlay(Image(systemName: icon).font(.system(size: 17)).foregroundStyle(tint))
+                .overlay(Image(systemName: icon).font(.system(size: 17, design: .rounded)).foregroundStyle(tint))
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(Theme.text)
                 Text(connected ? "Connected" : "Not connected")
-                    .font(.system(size: 13))
+                    .font(.system(size: 13, design: .rounded))
                     .foregroundStyle(connected ? Theme.success : Theme.textMuted)
                     .contentTransition(.numericText())
             }
             Spacer()
             Button(connected ? "Disconnect" : "Connect", action: action)
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
                 .buttonStyle(.borderless)
                 .foregroundStyle(connected ? Theme.textMuted : .white)
                 .padding(.horizontal, 14)
