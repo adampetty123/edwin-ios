@@ -25,8 +25,9 @@ struct WAChat: Codable, Identifiable, Equatable {
     let lastMessageText: String?
     let lastMessageAt: Date?
     let lastSender: String?
-    let unread: Int?
+    var unread: Int?
     let isGroup: Bool?
+    let avatarUrl: String?
 
     var id: String { jid }
     var displayName: String { (name?.isEmpty == false ? name! : jid.components(separatedBy: "@").first) ?? jid }
@@ -37,7 +38,13 @@ struct WAChat: Codable, Identifiable, Equatable {
         case lastMessageAt = "last_message_at"
         case lastSender = "last_sender"
         case isGroup = "is_group"
+        case avatarUrl = "avatar_url"
     }
+}
+
+struct WAReaction: Codable, Equatable {
+    let by: String
+    let emoji: String
 }
 
 struct WAMessage: Codable, Identifiable, Equatable {
@@ -48,11 +55,20 @@ struct WAMessage: Codable, Identifiable, Equatable {
     let fromMe: Bool
     let text: String
     let ts: Date
+    let mediaType: String?
+    let mediaUrl: String?
+    let reactions: [WAReaction]?
+    let status: String?          // sent | delivered | read (from_me only)
+    let quotedMsgId: String?
+    let quotedText: String?
+    let quotedSender: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, text, ts
+        case id, text, ts, reactions, status
         case chatJid = "chat_jid", msgId = "msg_id"
         case senderName = "sender_name", fromMe = "from_me"
+        case mediaType = "media_type", mediaUrl = "media_url"
+        case quotedMsgId = "quoted_msg_id", quotedText = "quoted_text", quotedSender = "quoted_sender"
     }
 }
 
@@ -115,10 +131,27 @@ enum WAClient {
     }
 
     /// Queue an outbound message — the bridge picks it up and sends.
-    static func send(userId: String, chatJid: String, text: String, token: String) async throws {
+    static func send(userId: String, chatJid: String, text: String, replyTo: String? = nil, token: String) async throws {
+        var row: [String: Any] = ["user_id": userId, "chat_jid": chatJid, "text": text]
+        if let replyTo { row["reply_to_msg_id"] = replyTo }
+        _ = try await request("POST", "/wa_outbox", token: token, body: [row], prefer: "return=minimal")
+    }
+
+    /// Queue a reaction (empty emoji removes it).
+    static func react(userId: String, chatJid: String, msgId: String, emoji: String, token: String) async throws {
         _ = try await request(
             "POST", "/wa_outbox", token: token,
-            body: [["user_id": userId, "chat_jid": chatJid, "text": text]],
+            body: [["user_id": userId, "chat_jid": chatJid, "text": "", "kind": "reaction",
+                    "react_to_msg_id": msgId, "react_emoji": emoji]],
+            prefer: "return=minimal"
+        )
+    }
+
+    /// Tell the bridge to mark a chat read (syncs blue ticks to WhatsApp).
+    static func markRead(userId: String, chatJid: String, token: String) async throws {
+        _ = try await request(
+            "POST", "/wa_commands", token: token,
+            body: [["user_id": userId, "kind": "mark_read", "chat_jid": chatJid]],
             prefer: "return=minimal"
         )
     }

@@ -171,14 +171,21 @@ struct ChatRow: View {
 
     private var avatar: some View {
         ZStack(alignment: .bottomTrailing) {
-            Circle()
-                .fill(avatarColor)
-                .frame(width: 48, height: 48)
-                .overlay(
-                    chat.isGroup == true
-                    ? AnyView(Image(systemName: "person.2.fill").font(.system(size: 16)).foregroundStyle(.white))
-                    : AnyView(Text(initials).font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(.white))
-                )
+            Group {
+                if let urlStr = chat.avatarUrl, let url = URL(string: urlStr) {
+                    AsyncImage(url: url) { phase in
+                        if case .success(let img) = phase {
+                            img.resizable().scaledToFill()
+                        } else {
+                            fallbackAvatar
+                        }
+                    }
+                } else {
+                    fallbackAvatar
+                }
+            }
+            .frame(width: 48, height: 48)
+            .clipShape(Circle())
             Circle()
                 .fill(Theme.whatsapp)
                 .frame(width: 18, height: 18)
@@ -186,6 +193,16 @@ struct ChatRow: View {
                 .overlay(Circle().stroke(Theme.bg, lineWidth: 2))
                 .offset(x: 2, y: 2)
         }
+    }
+
+    private var fallbackAvatar: some View {
+        Circle()
+            .fill(avatarColor)
+            .overlay(
+                chat.isGroup == true
+                ? AnyView(Image(systemName: "person.2.fill").font(.system(size: 16)).foregroundStyle(.white))
+                : AnyView(Text(initials).font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(.white))
+            )
     }
 
     private var initials: String {

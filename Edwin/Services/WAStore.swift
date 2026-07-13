@@ -45,10 +45,24 @@ final class WAStore: ObservableObject {
         }
     }
 
-    func send(chatJid: String, text: String) async throws {
+    func send(chatJid: String, text: String, replyTo: String? = nil) async throws {
         guard let token, let userId = auth?.userId, !userId.isEmpty else {
             throw AuthError.server("Not signed in.")
         }
-        try await WAClient.send(userId: userId, chatJid: chatJid, text: text, token: token)
+        try await WAClient.send(userId: userId, chatJid: chatJid, text: text, replyTo: replyTo, token: token)
+    }
+
+    func react(chatJid: String, msgId: String, emoji: String) async {
+        guard let token, let userId = auth?.userId, !userId.isEmpty else { return }
+        try? await WAClient.react(userId: userId, chatJid: chatJid, msgId: msgId, emoji: emoji, token: token)
+    }
+
+    /// Optimistically zero the badge, then sync read state to WhatsApp itself.
+    func markRead(chatJid: String) async {
+        if let i = chats.firstIndex(where: { $0.jid == chatJid }), (chats[i].unread ?? 0) > 0 {
+            chats[i].unread = 0
+        }
+        guard let token, let userId = auth?.userId, !userId.isEmpty else { return }
+        try? await WAClient.markRead(userId: userId, chatJid: chatJid, token: token)
     }
 }

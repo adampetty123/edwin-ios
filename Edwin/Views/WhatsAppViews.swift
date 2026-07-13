@@ -260,13 +260,14 @@ struct ConnectWhatsAppView: View {
     }
 }
 
-// MARK: - Chat view (real messages + approve-to-send composer)
+// MARK: - Chat view: media, replies, reactions, receipts — the full experience
 
 struct ChatView: View {
     @EnvironmentObject var wa: WAStore
     let chat: WAChat
 
     @State private var draft = ""
+    @State private var replyingTo: WAMessage?
     @State private var sendState: SendState = .idle
     enum SendState: Equatable { case idle, queued, failed(String) }
 
@@ -275,10 +276,15 @@ struct ChatView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 6) {
-                    ForEach(msgs) { m in
+                LazyVStack(spacing: 4) {
+                    ForEach(Array(msgs.enumerated()), id: \.element.id) { i, m in
+                        if showDay(at: i) {
+                            DaySeparator(date: m.ts)
+                        }
                         MessageBubble(message: m, isGroup: chat.isGroup ?? false)
                             .id(m.id)
+                            .contextMenu { contextMenu(for: m) }
+                            .onTapGesture(count: 2) { quickHeart(m) }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -294,6 +300,7 @@ struct ChatView: View {
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) { composer }
         .task {
+            await wa.markRead(chatJid: chat.jid)
             while !Task.isCancelled {
                 await wa.refreshMessages(chatJid: chat.jid)
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -301,14 +308,61 @@ struct ChatView: View {
         }
     }
 
+    private func showDay(at i: Int) -> Bool {
+        guard i > 0 else { return true }
+        return !Calendar.current.isDate(msgs[i].ts, inSameDayAs: msgs[i - 1].ts)
+    }
+
+    @ViewBuilder
+    private func contextMenu(for m: WAMessage) -> some View {
+        Button { replyingTo = m } label: { Label("Reply", systemImage: "arrowshape.turn.up.left") }
+        Button { UIPasteboard.general.string = m.text } label: { Label("Copy", systemImage: "doc.on.doc") }
+        Menu {
+            ForEach(["\u{2764}\u{FE0F}", "\u{1F44D}", "\u{1F602}", "\u{1F62E}", "\u{1F622}", "\u{1F64F}"], id: \.self) { e in
+                Button(e) { react(m, emoji: e) }
+            }
+            Button("Remove reaction") { react(m, emoji: "") }
+        } label: { Label("React", systemImage: "face.smiling") }
+    }
+
+    private func quickHeart(_ m: WAMessage) {
+        guard !m.fromMe else { return }
+        react(m, emoji: "\u{2764}\u{FE0F}")
+    }
+
+    private func react(_ m: WAMessage, emoji: String) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        Task {
+            await wa.react(chatJid: chat.jid, msgId: m.msgId, emoji: emoji)
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await wa.refreshMessages(chatJid: chat.jid)
+        }
+    }
+
     private var composer: some View {
         VStack(spacing: 6) {
+            if let r = replyingTo {
+                HStack(spacing: 8) {
+                    RoundedRectangle(cornerRadius: 1.5).fill(Theme.accent).frame(width: 3, height: 30)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(r.fromMe ? "You" : (r.senderName ?? chat.displayName))
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Theme.accent)
+                        Text(r.text).font(.system(size: 13, design: .rounded))
+                            .foregroundStyle(Theme.textMuted).lineLimit(1)
+                    }
+                    Spacer()
+                    Button { replyingTo = nil } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.textFaint)
+                    }
+                }
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Theme.surface))
+            }
             if case .failed(let why) = sendState {
-                Text(why)
-                    .font(.system(size: 12, design: .rounded))
-                    .foregroundStyle(Theme.danger)
+                Text(why).font(.system(size: 12, design: .rounded)).foregroundStyle(Theme.danger)
             } else if sendState == .queued {
-                Text("Queued — sending via your WhatsApp…")
+                Text("Sending via your WhatsApp\u{2026}")
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(Theme.textMuted)
             }
@@ -316,13 +370,10 @@ struct ChatView: View {
                 TextField("Message", text: $draft, axis: .vertical)
                     .font(.system(size: 16, design: .rounded))
                     .lineLimit(1...4)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
+                    .padding(.horizontal, 14).padding(.vertical, 9)
                     .background(RoundedRectangle(cornerRadius: 20).fill(Theme.surface))
                     .overlay(RoundedRectangle(cornerRadius: 20).stroke(Theme.border, lineWidth: 1))
-                Button {
-                    send()
-                } label: {
+                Button { send() } label: {
                     Image(systemName: "arrow.up")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(.white)
@@ -333,27 +384,48 @@ struct ChatView: View {
                 .accessibilityLabel("Send")
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 12).padding(.vertical, 8)
         .background(Theme.bg)
     }
 
     private func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        let reply = replyingTo?.msgId
         draft = ""
+        replyingTo = nil
         sendState = .queued
         Task {
             do {
-                try await wa.send(chatJid: chat.jid, text: text)
+                try await wa.send(chatJid: chat.jid, text: text, replyTo: reply)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 try? await Task.sleep(nanoseconds: 2_500_000_000)
                 await wa.refreshMessages(chatJid: chat.jid)
                 sendState = .idle
             } catch {
-                sendState = .failed("Didn't send — \(error.localizedDescription)")
+                sendState = .failed("Didn't send \u{2014} \(error.localizedDescription)")
             }
         }
+    }
+}
+
+struct DaySeparator: View {
+    let date: Date
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .foregroundStyle(Theme.textMuted)
+            .padding(.horizontal, 12).padding(.vertical, 4)
+            .background(Capsule().fill(Theme.surface))
+            .padding(.vertical, 8)
+    }
+
+    private var label: String {
+        let cal = Calendar.current
+        if cal.isDateInToday(date) { return "Today" }
+        if cal.isDateInYesterday(date) { return "Yesterday" }
+        return date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
     }
 }
 
@@ -364,31 +436,131 @@ struct MessageBubble: View {
     var body: some View {
         HStack {
             if message.fromMe { Spacer(minLength: 48) }
-            VStack(alignment: .leading, spacing: 3) {
-                if isGroup, !message.fromMe, let sender = message.senderName {
-                    Text(sender)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Theme.accent)
+            VStack(alignment: message.fromMe ? .trailing : .leading, spacing: 2) {
+                bubble
+                if let reactions = message.reactions, !reactions.isEmpty {
+                    reactionPills(reactions)
+                        .offset(y: -6)
+                        .padding(.bottom, -6)
                 }
-                Text(message.text)
-                    .font(.system(size: 16, design: .rounded))
-                    .foregroundStyle(message.fromMe ? .white : Theme.text)
-                Text(message.ts.formatted(date: .omitted, time: .shortened))
-                    .font(.system(size: 10.5, design: .rounded))
-                    .foregroundStyle(message.fromMe ? .white.opacity(0.7) : Theme.textFaint)
             }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(message.fromMe ? Theme.accent : Theme.surface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(message.fromMe ? .clear : Theme.border, lineWidth: 1)
-            )
             if !message.fromMe { Spacer(minLength: 48) }
         }
         .frame(maxWidth: .infinity, alignment: message.fromMe ? .trailing : .leading)
+    }
+
+    private var bubble: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if isGroup, !message.fromMe, let sender = message.senderName {
+                Text(sender)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Theme.accent)
+            }
+            if let qt = message.quotedText, !qt.isEmpty {
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(message.fromMe ? .white.opacity(0.6) : Theme.accent)
+                        .frame(width: 3)
+                    VStack(alignment: .leading, spacing: 1) {
+                        if let qs = message.quotedSender {
+                            Text(qs).font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                                .foregroundStyle(message.fromMe ? .white.opacity(0.9) : Theme.accent)
+                        }
+                        Text(qt).font(.system(size: 12.5, design: .rounded))
+                            .foregroundStyle(message.fromMe ? .white.opacity(0.75) : Theme.textMuted)
+                            .lineLimit(2)
+                    }
+                }
+                .padding(6)
+                .background(RoundedRectangle(cornerRadius: 8).fill(message.fromMe ? .white.opacity(0.14) : Theme.surfaceAlt))
+            }
+            mediaView
+            if showText {
+                Text(message.text)
+                    .font(.system(size: 16, design: .rounded))
+                    .foregroundStyle(message.fromMe ? .white : Theme.text)
+            }
+            HStack(spacing: 3) {
+                Text(message.ts.formatted(date: .omitted, time: .shortened))
+                    .font(.system(size: 10.5, design: .rounded))
+                if message.fromMe {
+                    Image(systemName: ticksIcon)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(message.status == "read" ? Color(hex: 0x8AD7FF) : .white.opacity(0.7))
+                }
+            }
+            .foregroundStyle(message.fromMe ? .white.opacity(0.7) : Theme.textFaint)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 16).fill(message.fromMe ? Theme.accent : Theme.surface))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(message.fromMe ? .clear : Theme.border, lineWidth: 1))
+    }
+
+    private var showText: Bool {
+        // hide the "[photo]" placeholder once real media renders
+        if message.mediaUrl != nil, message.text.hasPrefix("["), message.text.hasSuffix("]") { return false }
+        return !message.text.isEmpty
+    }
+
+    private var ticksIcon: String {
+        switch message.status {
+        case "read", "delivered": return "checkmark.circle.fill"
+        default: return "checkmark.circle"
+        }
+    }
+
+    @ViewBuilder
+    private var mediaView: some View {
+        if let urlStr = message.mediaUrl, let url = URL(string: urlStr) {
+            switch message.mediaType {
+            case "image", "sticker":
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let img):
+                        img.resizable().scaledToFill()
+                            .frame(maxWidth: 230, maxHeight: 280)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    case .failure:
+                        mediaChip(icon: "photo", label: "Photo")
+                    default:
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(message.fromMe ? .white.opacity(0.2) : Theme.surfaceAlt)
+                            .frame(width: 200, height: 140)
+                            .overlay(ProgressView())
+                    }
+                }
+            case "video":
+                Link(destination: url) { mediaChip(icon: "play.circle.fill", label: "Video") }
+            case "audio":
+                Link(destination: url) { mediaChip(icon: "waveform", label: "Voice message") }
+            case "document":
+                Link(destination: url) { mediaChip(icon: "doc.fill", label: "Document") }
+            default:
+                EmptyView()
+            }
+        }
+    }
+
+    private func mediaChip(icon: String, label: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon).font(.system(size: 18))
+            Text(label).font(.system(size: 15, weight: .medium, design: .rounded))
+        }
+        .foregroundStyle(message.fromMe ? .white : Theme.accent)
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 10).fill(message.fromMe ? .white.opacity(0.14) : Theme.surfaceAlt))
+    }
+
+    private func reactionPills(_ reactions: [WAReaction]) -> some View {
+        HStack(spacing: 2) {
+            ForEach(Array(Set(reactions.map(\.emoji))).sorted(), id: \.self) { e in
+                let n = reactions.filter { $0.emoji == e }.count
+                Text(n > 1 ? "\(e)\(n)" : e)
+                    .font(.system(size: 12, design: .rounded))
+            }
+        }
+        .padding(.horizontal, 7).padding(.vertical, 3)
+        .background(Capsule().fill(Theme.bg))
+        .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
     }
 }
