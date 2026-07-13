@@ -28,17 +28,35 @@ struct WAChat: Codable, Identifiable, Equatable {
     var unread: Int?
     let isGroup: Bool?
     let avatarUrl: String?
+    let isAssistant: Bool?
+    let pinned: Bool?
 
     var id: String { jid }
     var displayName: String { (name?.isEmpty == false ? name! : jid.components(separatedBy: "@").first) ?? jid }
+    var assistant: Bool { isAssistant == true || jid == "assistant@edwin" }
 
     enum CodingKeys: String, CodingKey {
-        case jid, name, unread
+        case jid, name, unread, pinned
         case lastMessageText = "last_message_text"
         case lastMessageAt = "last_message_at"
         case lastSender = "last_sender"
         case isGroup = "is_group"
         case avatarUrl = "avatar_url"
+        case isAssistant = "is_assistant"
+    }
+}
+
+struct AssistantDraft: Codable, Identifiable, Equatable {
+    let id: Int
+    let chatJid: String
+    let chatName: String?
+    let reason: String?
+    let text: String
+    let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, reason, text, status
+        case chatJid = "chat_jid", chatName = "chat_name"
     }
 }
 
@@ -154,5 +172,70 @@ enum WAClient {
             body: [["user_id": userId, "kind": "mark_read", "chat_jid": chatJid]],
             prefer: "return=minimal"
         )
+    }
+
+    // MARK: assistant (Edwin)
+
+    static let assistantJid = "assistant@edwin"
+
+    /// Make sure the pinned Edwin chat exists, with a welcome on first run.
+    static func ensureAssistant(userId: String, token: String) async throws {
+        let existing = try await messages(chatJid: assistantJid, token: token)
+        _ = try await request("POST", "/wa_chats?on_conflict=user_id,jid", token: token,
+            body: [["user_id": userId, "jid": assistantJid, "name": "Edwin",
+                    "is_assistant": true, "pinned": true]],
+            prefer: "resolution=merge-duplicates,return=minimal")
+        guard existing.isEmpty else { return }
+        let welcome = "hey, i'm edwin — your assistant. once your whatsapp is linked i'll watch your inbox, flag what actually needs you, and draft replies for you to approve. ask me anything, or tell me what to keep track of."
+        _ = try await request("POST", "/wa_messages", token: token,
+            body: [["user_id": userId, "chat_jid": assistantJid, "msg_id": "edwin-welcome",
+                    "sender_jid": "edwin", "sender_name": "Edwin", "from_me": false,
+                    "text": welcome, "ts": iso(Date())]],
+            prefer: "resolution=ignore-duplicates,return=minimal")
+        _ = try await request("POST", "/wa_chats?on_conflict=user_id,jid", token: token,
+            body: [["user_id": userId, "jid": assistantJid, "name": "Edwin", "is_assistant": true,
+                    "pinned": true, "last_message_text": welcome, "last_message_at": iso(Date()),
+                    "last_sender": "Edwin"]],
+            prefer: "resolution=merge-duplicates,return=minimal")
+    }
+
+    /// Owner speaks to Edwin: echo their message instantly, then queue the job.
+    static func sendToAssistant(userId: String, text: String, token: String) async throws {
+        let mid = "user-\(Int(Date().timeIntervalSince1970 * 1000))"
+        _ = try await request("POST", "/wa_messages", token: token,
+            body: [["user_id": userId, "chat_jid": assistantJid, "msg_id": mid,
+                    "sender_jid": "me", "sender_name": "You", "from_me": true,
+                    "text": text, "ts": iso(Date())]],
+            prefer: "resolution=ignore-duplicates,return=minimal")
+        _ = try await request("POST", "/wa_outbox", token: token,
+            body: [["user_id": userId, "chat_jid": assistantJid, "text": text, "kind": "assistant"]],
+            prefer: "return=minimal")
+    }
+
+    static func clearAssistantUnread(userId: String, token: String) async throws {
+        _ = try await request("PATCH", "/wa_chats?user_id=eq.\(userId)&jid=eq.assistant@edwin", token: token,
+            body: ["unread": 0], prefer: "return=minimal")
+    }
+
+    static func drafts(token: String) async throws -> [AssistantDraft] {
+        let data = try await request("GET", "/assistant_drafts?status=eq.pending&select=*&order=created_at.desc", token: token)
+        return try decoder.decode([AssistantDraft].self, from: data)
+    }
+
+    /// Approve a draft → queue it to the real chat and mark it approved.
+    static func approveDraft(_ draft: AssistantDraft, userId: String, editedText: String? = nil, token: String) async throws {
+        try await send(userId: userId, chatJid: draft.chatJid, text: editedText ?? draft.text, token: token)
+        _ = try await request("PATCH", "/assistant_drafts?id=eq.\(draft.id)", token: token,
+            body: ["status": editedText == nil ? "approved" : "edited"], prefer: "return=minimal")
+    }
+
+    static func dismissDraft(_ draft: AssistantDraft, token: String) async throws {
+        _ = try await request("PATCH", "/assistant_drafts?id=eq.\(draft.id)", token: token,
+            body: ["status": "dismissed"], prefer: "return=minimal")
+    }
+
+    private static func iso(_ date: Date) -> String {
+        let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f.string(from: date)
     }
 }

@@ -4,17 +4,11 @@ struct InboxView: View {
     @EnvironmentObject var auth: AuthStore
     @EnvironmentObject var wa: WAStore
 
+    private var realChats: [WAChat] { wa.chats.filter { !$0.assistant } }
+
     var body: some View {
         NavigationStack {
-            Group {
-                if !wa.isConnected && wa.chats.isEmpty {
-                    emptyNotConnected
-                } else if wa.chats.isEmpty {
-                    emptySyncing
-                } else {
-                    list
-                }
-            }
+            list
             .background(Theme.bg)
             .navigationTitle("Inbox")
             .toolbar {
@@ -26,13 +20,16 @@ struct InboxView: View {
                 ToolbarItem(placement: .topBarTrailing) { statusChip }
             }
             .navigationDestination(for: WAChat.self) { chat in
-                ChatView(chat: chat)
+                if chat.assistant { AssistantChatView(chat: chat) }
+                else { ChatView(chat: chat) }
             }
         }
         .task {
+            await wa.ensureAssistant()
             while !Task.isCancelled {
                 await wa.refreshAccount()
                 await wa.refreshChats()
+                await wa.refreshDrafts()
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
             }
         }
@@ -56,51 +53,52 @@ struct InboxView: View {
 
     private var list: some View {
         List {
-            ForEach(wa.chats) { chat in
-                NavigationLink(value: chat) {
-                    ChatRow(chat: chat)
+            // Edwin is always pinned at the very top
+            if let edwin = wa.assistantChat {
+                NavigationLink(value: edwin) {
+                    AssistantRow(chat: edwin, draftCount: wa.drafts.count)
                 }
-                .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
+                .listRowInsets(EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20))
                 .listRowSeparatorTint(Theme.border)
+                .listRowBackground(Theme.accentSoft.opacity(0.35))
+            }
+
+            if realChats.isEmpty {
+                (wa.isConnected ? syncingRow : notConnectedRow)
+                    .listRowSeparator(.hidden)
+            } else {
+                ForEach(realChats) { chat in
+                    NavigationLink(value: chat) { ChatRow(chat: chat) }
+                        .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
+                        .listRowSeparatorTint(Theme.border)
+                }
             }
         }
         .listStyle(.plain)
-        .refreshable {
-            await wa.refreshChats()
-        }
+        .refreshable { await wa.refreshChats() }
     }
 
-    private var emptyNotConnected: some View {
-        VStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Theme.accentSoft)
-                .frame(width: 72, height: 72)
-                .overlay(Image(systemName: "envelope.open").font(.system(size: 30)).foregroundStyle(Theme.accent))
-            Text("Your inbox is quiet")
-                .font(.system(size: 22, weight: .bold, design: .rounded))
+    private var notConnectedRow: some View {
+        VStack(spacing: 10) {
+            Text("Connect WhatsApp to fill your inbox")
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Theme.text)
-            Text("Connect WhatsApp in Settings and the chaos starts sorting itself out.")
-                .font(.system(size: 16, design: .rounded))
+            Text("Edwin's ready above. Link WhatsApp in Settings and your real chats show up here.")
+                .font(.system(size: 13, design: .rounded))
                 .foregroundStyle(Theme.textMuted)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity).padding(.vertical, 30).padding(.horizontal, 24)
     }
 
-    private var emptySyncing: some View {
-        VStack(spacing: 12) {
+    private var syncingRow: some View {
+        VStack(spacing: 8) {
             ProgressView()
-            Text("Syncing your chats…")
-                .font(.system(size: 22, weight: .bold, design: .rounded))
-                .foregroundStyle(Theme.text)
-            Text("\(wa.account?.messagesSynced ?? 0) messages in so far. First sync takes a minute.")
-                .font(.system(size: 15, weight: .medium, design: .monospaced))
+            Text("Syncing your chats\u{2026} \(wa.account?.messagesSynced ?? 0) messages in")
+                .font(.system(size: 13, weight: .medium, design: .monospaced))
                 .foregroundStyle(Theme.textMuted)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity).padding(.vertical, 30)
     }
 
     private var greeting: String {
@@ -219,4 +217,48 @@ struct ChatRow: View {
 
 extension WAChat: Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(jid) }
+}
+
+/// The pinned Edwin row — visually distinct from real contacts.
+struct AssistantRow: View {
+    let chat: WAChat
+    let draftCount: Int
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Theme.accent)
+                .frame(width: 48, height: 48)
+                .overlay(
+                    Text("e").font(.system(size: 26, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white).offset(y: -1)
+                )
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text("Edwin").font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.text)
+                    Text("YOUR ASSISTANT")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Capsule().fill(Theme.accent.opacity(0.12)))
+                    Spacer()
+                    Image(systemName: "pin.fill").font(.system(size: 10)).foregroundStyle(Theme.textFaint)
+                }
+                Text(chat.lastMessageText ?? "ask me anything about your inbox")
+                    .font(.system(size: 14, design: .rounded))
+                    .foregroundStyle(Theme.textMuted)
+                    .lineLimit(1)
+            }
+            if draftCount > 0 {
+                Text("\(draftCount)")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7).padding(.vertical, 2)
+                    .background(Capsule().fill(Theme.accent))
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Edwin, your assistant. \(draftCount) drafts awaiting approval.")
+    }
 }

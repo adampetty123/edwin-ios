@@ -8,8 +8,10 @@ final class WAStore: ObservableObject {
     @Published var account: WAAccount?
     @Published var chats: [WAChat] = []
     @Published var messages: [String: [WAMessage]] = [:]
+    @Published var drafts: [AssistantDraft] = []
 
     weak var auth: AuthStore?
+    private var assistantReady = false
 
     var isConnected: Bool { account?.status == "connected" }
 
@@ -63,6 +65,45 @@ final class WAStore: ObservableObject {
             chats[i].unread = 0
         }
         guard let token, let userId = auth?.userId, !userId.isEmpty else { return }
+        if chatJid == WAClient.assistantJid {
+            try? await WAClient.clearAssistantUnread(userId: userId, token: token)
+            return
+        }
         try? await WAClient.markRead(userId: userId, chatJid: chatJid, token: token)
+    }
+
+    // MARK: assistant (Edwin)
+
+    var assistantChat: WAChat? { chats.first(where: { $0.assistant }) }
+
+    func ensureAssistant() async {
+        guard !assistantReady, let token, let userId = auth?.userId, !userId.isEmpty else { return }
+        assistantReady = true
+        try? await WAClient.ensureAssistant(userId: userId, token: token)
+        await refreshChats()
+    }
+
+    func sendToAssistant(text: String) async throws {
+        guard let token, let userId = auth?.userId, !userId.isEmpty else {
+            throw AuthError.server("Not signed in.")
+        }
+        try await WAClient.sendToAssistant(userId: userId, text: text, token: token)
+    }
+
+    func refreshDrafts() async {
+        guard let token else { return }
+        if let d = try? await WAClient.drafts(token: token), d != drafts { drafts = d }
+    }
+
+    func approveDraft(_ draft: AssistantDraft, editedText: String? = nil) async {
+        guard let token, let userId = auth?.userId else { return }
+        try? await WAClient.approveDraft(draft, userId: userId, editedText: editedText, token: token)
+        drafts.removeAll { $0.id == draft.id }
+    }
+
+    func dismissDraft(_ draft: AssistantDraft) async {
+        guard let token else { return }
+        try? await WAClient.dismissDraft(draft, token: token)
+        drafts.removeAll { $0.id == draft.id }
     }
 }
