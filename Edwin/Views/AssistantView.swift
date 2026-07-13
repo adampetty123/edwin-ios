@@ -59,7 +59,7 @@ struct AssistantChatView: View {
                 }
                 composer
             }
-            .background(Theme.bg)
+            .background(.ultraThinMaterial)
         }
         .task {
             await wa.markRead(chatJid: chat.jid)
@@ -97,13 +97,13 @@ struct AssistantChatView: View {
     }
 
     private var composerBar: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .bottom, spacing: 10) {
             PhotosPicker(selection: $pickedItem, matching: .images) {
                 Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.textMuted)
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(Theme.surface))
+                    .frame(width: 44, height: 44)
+                    .liquidGlassCircle()
             }
             .onChange(of: pickedItem) {
                 Task {
@@ -118,20 +118,19 @@ struct AssistantChatView: View {
             TextField("Message Edwin", text: $draft, axis: .vertical)
                 .font(.system(size: 16, design: .rounded))
                 .lineLimit(1...4)
-                .padding(.horizontal, 14).padding(.vertical, 9)
-                .background(RoundedRectangle(cornerRadius: 20).fill(Theme.surface))
-                .overlay(RoundedRectangle(cornerRadius: 20).stroke(Theme.border, lineWidth: 1))
+                .padding(.horizontal, 16).padding(.vertical, 13)
+                .liquidGlassField()
             Button { send() } label: {
                 Image(systemName: "arrow.up")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 44, height: 44)
                     .background(Circle().fill(draft.trimmingCharacters(in: .whitespaces).isEmpty && pickedImage == nil ? Theme.border : Theme.accent))
             }
             .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty && pickedImage == nil)
             .accessibilityLabel("Send")
         }
-        .padding(.horizontal, 12).padding(.bottom, 8)
+        .padding(.horizontal, 12).padding(.vertical, 10)
     }
 
     private func send() {

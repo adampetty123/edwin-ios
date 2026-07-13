@@ -367,26 +367,25 @@ struct ChatView: View {
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(Theme.textMuted)
             }
-            HStack(spacing: 10) {
+            HStack(alignment: .bottom, spacing: 10) {
                 TextField("Message", text: $draft, axis: .vertical)
                     .font(.system(size: 16, design: .rounded))
                     .lineLimit(1...4)
-                    .padding(.horizontal, 14).padding(.vertical, 9)
-                    .background(RoundedRectangle(cornerRadius: 20).fill(Theme.surface))
-                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Theme.border, lineWidth: 1))
+                    .padding(.horizontal, 16).padding(.vertical, 13)
+                    .liquidGlassField()
                 Button { send() } label: {
                     Image(systemName: "arrow.up")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(.white)
-                        .frame(width: 38, height: 38)
+                        .frame(width: 44, height: 44)
                         .background(Circle().fill(draft.trimmingCharacters(in: .whitespaces).isEmpty ? Theme.border : Theme.accent))
                 }
                 .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
                 .accessibilityLabel("Send")
             }
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(Theme.bg)
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .background(.ultraThinMaterial)
     }
 
     private func send() {

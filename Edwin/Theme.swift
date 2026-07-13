@@ -41,3 +41,31 @@ extension Color {
         )
     }
 }
+
+
+// MARK: liquid glass helpers
+extension View {
+    /// Liquid-glass capsule field: real glassEffect on iOS 26, material fallback earlier.
+    @ViewBuilder
+    func liquidGlassField() -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular, in: .capsule)
+        } else {
+            self
+                .background(Capsule().fill(.ultraThinMaterial))
+                .overlay(Capsule().stroke(.white.opacity(0.35), lineWidth: 0.5))
+        }
+    }
+
+    /// Liquid-glass circle (for round composer buttons).
+    @ViewBuilder
+    func liquidGlassCircle() -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular, in: .circle)
+        } else {
+            self
+                .background(Circle().fill(.ultraThinMaterial))
+                .overlay(Circle().stroke(.white.opacity(0.35), lineWidth: 0.5))
+        }
+    }
+}
