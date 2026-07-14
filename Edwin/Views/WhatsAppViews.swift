@@ -281,7 +281,12 @@ struct ChatView: View {
                         if showDay(at: i) {
                             DaySeparator(date: m.ts)
                         }
-                        MessageBubble(message: m, isGroup: chat.isGroup ?? false)
+                        MessageBubble(
+                            message: m,
+                            isGroup: chat.isGroup ?? false,
+                            showSender: showSender(at: i),
+                            senderAvatarUrl: senderAvatar(m)
+                        )
                             .id(m.id)
                             .contextMenu { contextMenu(for: m) }
                             .onTapGesture(count: 2) { quickHeart(m) }
@@ -298,6 +303,18 @@ struct ChatView: View {
         .background(Theme.bg)
         .navigationTitle(chat.displayName)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // pfp + name in the chat header, like WhatsApp / iMessage
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 8) {
+                    PfpAvatar(name: chat.displayName, jid: chat.jid,
+                              urlString: chat.avatarUrl, isGroup: chat.isGroup ?? false, size: 30)
+                    Text(chat.displayName)
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .lineLimit(1)
+                }
+            }
+        }
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom) { composer }
         .task {
@@ -312,6 +329,22 @@ struct ChatView: View {
     private func showDay(at i: Int) -> Bool {
         guard i > 0 else { return true }
         return !Calendar.current.isDate(msgs[i].ts, inSameDayAs: msgs[i - 1].ts)
+    }
+
+    /// First message of a same-sender run (or after a day break) carries the
+    /// sender pfp + name; the rest of the run stays clean.
+    private func showSender(at i: Int) -> Bool {
+        guard i > 0 else { return true }
+        let prev = msgs[i - 1], m = msgs[i]
+        if prev.fromMe != m.fromMe { return true }
+        if (prev.senderJid ?? prev.senderName) != (m.senderJid ?? m.senderName) { return true }
+        return !Calendar.current.isDate(m.ts, inSameDayAs: prev.ts)
+    }
+
+    /// Group senders get their pfp from their own DM chat row when we have one.
+    private func senderAvatar(_ m: WAMessage) -> String? {
+        guard let sj = m.senderJid, sj != "me" else { return nil }
+        return wa.chats.first(where: { $0.jid == sj })?.avatarUrl
     }
 
     @ViewBuilder
@@ -429,13 +462,82 @@ struct DaySeparator: View {
     }
 }
 
+/// Small circular profile picture with a stable-colored initials fallback.
+struct PfpAvatar: View {
+    let name: String
+    let jid: String
+    let urlString: String?
+    var isGroup: Bool = false
+    var size: CGFloat = 28
+
+    var body: some View {
+        Group {
+            if let urlString, let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    if case .success(let img) = phase {
+                        img.resizable().scaledToFill()
+                    } else {
+                        fallback
+                    }
+                }
+            } else {
+                fallback
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+    }
+
+    private var fallback: some View {
+        Circle()
+            .fill(color)
+            .overlay(
+                isGroup
+                ? AnyView(Image(systemName: "person.2.fill")
+                    .font(.system(size: size * 0.4)).foregroundStyle(.white))
+                : AnyView(Text(initials)
+                    .font(.system(size: size * 0.42, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white))
+            )
+    }
+
+    private var initials: String {
+        let parts = name.split(separator: " ").prefix(2).compactMap { $0.first.map(String.init) }
+        let joined = parts.joined().uppercased()
+        return joined.isEmpty ? "#" : joined
+    }
+
+    private var color: Color {
+        // stable across launches (hashValue is seed-randomized; unicode sum is not)
+        let palette: [UInt32] = [0xA65468, 0x5E67A0, 0x3F8A7E, 0x4A6D9C, 0xA9803F, 0x7E5EA0, 0x5E8AA0]
+        let sum = jid.unicodeScalars.reduce(0) { $0 &+ UInt32($1.value) }
+        return Color(hex: palette[Int(sum % UInt32(palette.count))])
+    }
+}
+
 struct MessageBubble: View {
     let message: WAMessage
     let isGroup: Bool
+    var showSender: Bool = true
+    var senderAvatarUrl: String? = nil
+
+    /// Incoming group messages get a pfp gutter; first-of-run shows the pfp,
+    /// the rest keep a clear spacer so bubbles stay aligned.
+    private var showsAvatarGutter: Bool { isGroup && !message.fromMe }
 
     var body: some View {
-        HStack {
+        HStack(alignment: .top, spacing: 8) {
             if message.fromMe { Spacer(minLength: 48) }
+            if showsAvatarGutter {
+                if showSender {
+                    PfpAvatar(name: message.senderName ?? "?",
+                              jid: message.senderJid ?? (message.senderName ?? "?"),
+                              urlString: senderAvatarUrl, size: 28)
+                        .padding(.top, 2)
+                } else {
+                    Color.clear.frame(width: 28, height: 1)
+                }
+            }
             VStack(alignment: message.fromMe ? .trailing : .leading, spacing: 2) {
                 bubble
                 if let reactions = message.reactions, !reactions.isEmpty {
@@ -467,7 +569,7 @@ struct MessageBubble: View {
 
     private var bubble: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if isGroup, !message.fromMe, let sender = message.senderName {
+            if isGroup, !message.fromMe, showSender, let sender = message.senderName {
                 Text(sender)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Theme.accent)

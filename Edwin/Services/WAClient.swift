@@ -83,6 +83,7 @@ struct WAMessage: Codable, Identifiable, Equatable {
     let chatJid: String
     let msgId: String
     let senderName: String?
+    let senderJid: String?
     let fromMe: Bool
     let text: String
     let ts: Date
@@ -97,7 +98,7 @@ struct WAMessage: Codable, Identifiable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, text, ts, reactions, status
         case chatJid = "chat_jid", msgId = "msg_id"
-        case senderName = "sender_name", fromMe = "from_me"
+        case senderName = "sender_name", senderJid = "sender_jid", fromMe = "from_me"
         case mediaType = "media_type", mediaUrl = "media_url"
         case quotedMsgId = "quoted_msg_id", quotedText = "quoted_text", quotedSender = "quoted_sender"
     }
