@@ -46,28 +46,11 @@ struct EdwinTab: View {
     }
 }
 
-// MARK: - Email (placeholder until Gmail lands)
+// MARK: - Email (gmail inbox, synced by the bridge into supabase)
 
 struct EmailTab: View {
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 14) {
-                Image(systemName: "envelope.badge")
-                    .font(.system(size: 44))
-                    .foregroundStyle(Theme.textFaint)
-                Text("Email is coming soon")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(Theme.text)
-                Text("Edwin will triage your Gmail the same way he handles WhatsApp — junk archived, what matters surfaced.")
-                    .font(.system(size: 14, design: .rounded))
-                    .foregroundStyle(Theme.textMuted)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Theme.bg)
-            .navigationTitle("Email")
-        }
+        EmailListView()
     }
 }
 
