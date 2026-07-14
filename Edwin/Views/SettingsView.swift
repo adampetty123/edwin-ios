@@ -9,8 +9,9 @@ struct SettingsView: View {
     @State private var showEmailSheet = false
     @State private var showCalendarPicker = false
 
+    // NOTE: no NavigationStack here — Settings is pushed onto the Inbox stack
+    // from the gear button in the top-right corner.
     var body: some View {
-        NavigationStack {
             List {
                 Section {
                     HStack(spacing: 12) {
@@ -131,7 +132,8 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showEmailSheet) { EmailConnectSheet() }
             .sheet(isPresented: $showCalendarPicker) { CalendarPickerSheet() }
-        }
+        .background(Theme.bg)
+        .toolbar(.hidden, for: .tabBar)
         .task {
             // keep the calendar fresh whenever settings opens
             if cal.connected { await cal.sync() }

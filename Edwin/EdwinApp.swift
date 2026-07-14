@@ -34,22 +34,11 @@ struct RootView: View {
             } else if !auth.onboarded {
                 OnboardingFlow()
             } else {
-                MainTabView()
+                InboxView()
             }
         }
         .animation(.easeInOut(duration: 0.25), value: auth.isAuthed)
         .animation(.easeInOut(duration: 0.25), value: auth.onboarded)
         .task { await auth.restoreSession() }
-    }
-}
-
-struct MainTabView: View {
-    var body: some View {
-        TabView {
-            InboxView()
-                .tabItem { Label("Inbox", systemImage: "envelope.fill") }
-            SettingsView()
-                .tabItem { Label("Settings", systemImage: "gearshape") }
-        }
     }
 }

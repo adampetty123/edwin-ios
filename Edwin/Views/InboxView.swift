@@ -7,6 +7,7 @@ struct InboxView: View {
     @State private var search = ""
     @State private var messageHits: [WAMessage] = []
     @State private var searchTask: Task<Void, Never>?
+    @State private var showSettings = false
 
     private var realChats: [WAChat] { wa.chats.filter { !$0.assistant } }
     private var searching: Bool { !search.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -50,12 +51,13 @@ struct InboxView: View {
                         .font(.system(size: 12, design: .rounded))
                         .foregroundStyle(Theme.textMuted)
                 }
-                ToolbarItem(placement: .topBarTrailing) { statusChip }
+                ToolbarItem(placement: .topBarTrailing) { settingsButton }
             }
             .navigationDestination(for: WAChat.self) { chat in
                 if chat.assistant { AssistantChatView(chat: chat) }
                 else { ChatView(chat: chat) }
             }
+            .navigationDestination(isPresented: $showSettings) { SettingsView() }
         }
         .task {
             await wa.ensureAssistant()
@@ -70,20 +72,22 @@ struct InboxView: View {
 
     private func chat(for jid: String) -> WAChat? { wa.chats.first { $0.jid == jid } }
 
-    // live connection status — the bridge is always visible, never magic
-    private var statusChip: some View {
-        HStack(spacing: 5) {
-            Circle()
-                .fill(wa.isConnected ? Theme.success : Theme.textFaint)
-                .frame(width: 7, height: 7)
-            Text(wa.isConnected ? "LIVE" : "OFFLINE")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(wa.isConnected ? Theme.success : Theme.textFaint)
+    // Settings lives behind the gear. Connection state stays visible without
+    // shouting: a small dot on the gear — green when live, grey when offline.
+    private var settingsButton: some View {
+        Button { showSettings = true } label: {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 17))
+                .foregroundStyle(Theme.textMuted)
+                .overlay(alignment: .topTrailing) {
+                    Circle()
+                        .fill(wa.isConnected ? Theme.success : Theme.textFaint)
+                        .frame(width: 7, height: 7)
+                        .overlay(Circle().stroke(Theme.bg, lineWidth: 1.5))
+                        .offset(x: 3, y: -3)
+                }
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 4)
-        .background(Capsule().fill(Theme.surface))
-        .accessibilityLabel(wa.isConnected ? "WhatsApp connected" : "WhatsApp offline")
+        .accessibilityLabel(wa.isConnected ? "Settings. WhatsApp connected" : "Settings. WhatsApp offline")
     }
 
     @ViewBuilder
