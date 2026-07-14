@@ -33,8 +33,12 @@ struct InboxView: View {
         NavigationStack {
             list
             .background(Theme.bg)
-            .navigationTitle("Inbox")
-            .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search chats and messages")
+            .navigationTitle("All Chats")
+            .navigationBarTitleDisplayMode(.inline)
+            // default placement + minimize behavior = iOS 26 liquid glass
+            // search pill docked at the bottom edge
+            .searchable(text: $search, prompt: "Search chats and messages")
+            .liquidGlassSearch()
             .onChange(of: search) {
                 let q = search
                 searchTask?.cancel()
@@ -47,10 +51,23 @@ struct InboxView: View {
                 }
             }
             .toolbar {
+                // Edwin quick-access circle on the left, settings circle on the
+                // right, small centered title in line with both.
                 ToolbarItem(placement: .topBarLeading) {
-                    Text(greeting)
-                        .font(.system(size: 12, design: .rounded))
-                        .foregroundStyle(Theme.textMuted)
+                    if let edwin = wa.assistantChat {
+                        NavigationLink(value: edwin) {
+                            Image("EdwinAvatar")
+                                .resizable().scaledToFill()
+                                .frame(width: 32, height: 32)
+                                .clipShape(Circle())
+                        }
+                        .accessibilityLabel("Edwin")
+                    }
+                }
+                ToolbarItem(placement: .principal) {
+                    Text("All Chats")
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Theme.text)
                 }
                 ToolbarItem(placement: .topBarTrailing) { settingsButton }
             }
@@ -83,15 +100,19 @@ struct InboxView: View {
     // shouting: a small dot on the gear — green when live, grey when offline.
     private var settingsButton: some View {
         Button { showSettings = true } label: {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 17))
-                .foregroundStyle(Theme.textMuted)
+            Circle()
+                .fill(Theme.surface)
+                .frame(width: 32, height: 32)
+                .overlay(
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.textMuted)
+                )
                 .overlay(alignment: .topTrailing) {
                     Circle()
                         .fill(wa.isConnected ? Theme.success : Theme.textFaint)
-                        .frame(width: 7, height: 7)
+                        .frame(width: 8, height: 8)
                         .overlay(Circle().stroke(Theme.bg, lineWidth: 1.5))
-                        .offset(x: 3, y: -3)
                 }
         }
         .accessibilityLabel(wa.isConnected ? "Settings. WhatsApp connected" : "Settings. WhatsApp offline")
@@ -320,6 +341,18 @@ struct ChatRow: View {
 
 extension WAChat: Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(jid) }
+}
+
+extension View {
+    /// iOS 26 liquid glass search (bottom pill that minimizes); no-op earlier.
+    @ViewBuilder
+    func liquidGlassSearch() -> some View {
+        if #available(iOS 26.0, *) {
+            self.searchToolbarBehavior(.minimize)
+        } else {
+            self
+        }
+    }
 }
 
 /// A message-search hit: chat name + the matching line with the term emphasized.
