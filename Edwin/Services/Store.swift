@@ -39,14 +39,20 @@ final class Store: ObservableObject {
         checked = true
     }
 
+    @Published var productsLoaded = false
+
     func loadProducts() async {
         do {
             let products = try await Product.products(for: Self.productIds)
             quarterly = products.first { $0.id == Self.quarterlyId }
             monthly = products.first { $0.id == Self.monthlyId }
+            if products.isEmpty {
+                error = "Plans aren't available right now. Tap to retry."
+            }
         } catch {
-            self.error = "Couldn't load plans. Check your connection and try again."
+            self.error = "Couldn't load plans. Check your connection and tap to retry."
         }
+        productsLoaded = true
     }
 
     func refreshEntitlement() async {

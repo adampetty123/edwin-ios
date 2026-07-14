@@ -97,7 +97,23 @@ struct PaywallView: View {
                 )
             }
             if store.quarterly == nil && store.monthly == nil {
-                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 30)
+                if store.productsLoaded {
+                    Button {
+                        Task { store.error = nil; await store.loadProducts() }
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 20, weight: .semibold))
+                            Text("Plans didn't load — tap to retry")
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                        }
+                        .foregroundStyle(Theme.textMuted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                    }
+                } else {
+                    ProgressView().frame(maxWidth: .infinity).padding(.vertical, 30)
+                }
             }
         }
     }
