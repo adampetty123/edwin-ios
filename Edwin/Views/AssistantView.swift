@@ -38,6 +38,7 @@ struct AssistantChatView: View {
                 .padding(.horizontal, 16).padding(.vertical, 12)
             }
             .defaultScrollAnchor(.bottom)
+            .scrollDismissesKeyboard(.interactively)
             .onChange(of: msgs.count) {
                 // only Edwin's reply ends the typing state — our own echoed
                 // message must NOT kill the indicator (the old bug)
