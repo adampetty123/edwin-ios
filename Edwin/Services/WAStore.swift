@@ -11,6 +11,8 @@ final class WAStore: ObservableObject {
     @Published var drafts: [AssistantDraft] = []
     /// True while Edwin has a queued or in-flight job — drives the typing indicator.
     @Published var assistantBusy = false
+    /// Group-sender pfps: sender jid -> avatar url.
+    @Published var senderAvatars: [String: String] = [:]
 
     weak var auth: AuthStore?
     private var assistantReady = false
@@ -109,6 +111,13 @@ final class WAStore: ObservableObject {
     func refreshDrafts() async {
         guard let token else { return }
         if let d = try? await WAClient.drafts(token: token), d != drafts { drafts = d }
+    }
+
+    func refreshSenderAvatars() async {
+        guard let token else { return }
+        if let m = try? await WAClient.senderAvatars(token: token), m != senderAvatars {
+            senderAvatars = m
+        }
     }
 
     func refreshAssistantBusy() async {

@@ -240,6 +240,15 @@ enum WAClient {
             prefer: "return=minimal")
     }
 
+    /// Profile pictures for group-message senders, keyed by sender jid.
+    static func senderAvatars(token: String) async throws -> [String: String] {
+        let data = try await request("GET",
+            "/wa_sender_avatars?select=jid,avatar_url&avatar_url=not.is.null&limit=2000", token: token)
+        struct Row: Codable { let jid: String; let avatar_url: String }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        return Dictionary(uniqueKeysWithValues: rows.map { ($0.jid, $0.avatar_url) })
+    }
+
     /// Edwin is "typing" while an assistant job is queued or being worked.
     static func assistantBusy(token: String) async throws -> Bool {
         let data = try await request("GET",

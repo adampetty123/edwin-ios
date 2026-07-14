@@ -319,6 +319,7 @@ struct ChatView: View {
         .safeAreaInset(edge: .bottom) { composer }
         .task {
             await wa.markRead(chatJid: chat.jid)
+            if chat.isGroup == true { await wa.refreshSenderAvatars() }
             while !Task.isCancelled {
                 await wa.refreshMessages(chatJid: chat.jid)
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -341,10 +342,11 @@ struct ChatView: View {
         return !Calendar.current.isDate(m.ts, inSameDayAs: prev.ts)
     }
 
-    /// Group senders get their pfp from their own DM chat row when we have one.
+    /// Group senders: dedicated sender-avatar store first (covers lid ids and
+    /// people with no DM chat), then their DM chat row as fallback.
     private func senderAvatar(_ m: WAMessage) -> String? {
         guard let sj = m.senderJid, sj != "me" else { return nil }
-        return wa.chats.first(where: { $0.jid == sj })?.avatarUrl
+        return wa.senderAvatars[sj] ?? wa.chats.first(where: { $0.jid == sj })?.avatarUrl
     }
 
     @ViewBuilder
