@@ -9,6 +9,8 @@ final class WAStore: ObservableObject {
     @Published var chats: [WAChat] = []
     @Published var messages: [String: [WAMessage]] = [:]
     @Published var drafts: [AssistantDraft] = []
+    /// True while Edwin has a queued or in-flight job — drives the typing indicator.
+    @Published var assistantBusy = false
 
     weak var auth: AuthStore?
     private var assistantReady = false
@@ -107,6 +109,13 @@ final class WAStore: ObservableObject {
     func refreshDrafts() async {
         guard let token else { return }
         if let d = try? await WAClient.drafts(token: token), d != drafts { drafts = d }
+    }
+
+    func refreshAssistantBusy() async {
+        guard let token else { return }
+        if let b = try? await WAClient.assistantBusy(token: token), b != assistantBusy {
+            assistantBusy = b
+        }
     }
 
     func approveDraft(_ draft: AssistantDraft, editedText: String? = nil) async {

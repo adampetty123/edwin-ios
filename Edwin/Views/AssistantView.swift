@@ -14,6 +14,10 @@ struct AssistantChatView: View {
 
     private var msgs: [WAMessage] { wa.messages[WAClient.assistantJid] ?? [] }
 
+    /// Typing shows for a queued/in-flight backend job (covers jobs started
+    /// anywhere) OR the optimistic local flag right after hitting send.
+    private var showTyping: Bool { thinking || wa.assistantBusy }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -23,7 +27,7 @@ struct AssistantChatView: View {
                         MessageBubble(message: m, isGroup: false)
                             .id(m.id)
                     }
-                    if thinking {
+                    if showTyping {
                         TypingBubble()
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 2)
@@ -35,11 +39,17 @@ struct AssistantChatView: View {
             }
             .defaultScrollAnchor(.bottom)
             .onChange(of: msgs.count) {
-                withAnimation { thinking = false }
+                // only Edwin's reply ends the typing state — our own echoed
+                // message must NOT kill the indicator (the old bug)
+                if msgs.last?.fromMe == false { withAnimation { thinking = false } }
                 if let last = msgs.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
             }
-            .onChange(of: thinking) {
-                if thinking { withAnimation { proxy.scrollTo("thinking", anchor: .bottom) } }
+            .onChange(of: wa.assistantBusy) {
+                // backend job finished — clear the local optimistic flag too
+                if !wa.assistantBusy { withAnimation { thinking = false } }
+            }
+            .onChange(of: showTyping) {
+                if showTyping { withAnimation { proxy.scrollTo("thinking", anchor: .bottom) } }
             }
         }
         .background(Theme.bg)
@@ -65,6 +75,7 @@ struct AssistantChatView: View {
             while !Task.isCancelled {
                 await wa.refreshMessages(chatJid: WAClient.assistantJid)
                 await wa.refreshDrafts()
+                await wa.refreshAssistantBusy()
                 try? await Task.sleep(nanoseconds: 2_500_000_000)
             }
         }
@@ -141,9 +152,14 @@ struct AssistantChatView: View {
         pickedItem = nil
         withAnimation { thinking = true }
         Task {
-            try? await wa.sendToAssistant(text: text, imageData: image)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            await wa.refreshMessages(chatJid: WAClient.assistantJid)
+            do {
+                try await wa.sendToAssistant(text: text, imageData: image)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                await wa.refreshMessages(chatJid: WAClient.assistantJid)
+                await wa.refreshAssistantBusy()
+            } catch {
+                withAnimation { thinking = false }
+            }
         }
     }
 }

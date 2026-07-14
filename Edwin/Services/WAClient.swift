@@ -240,6 +240,15 @@ enum WAClient {
             prefer: "return=minimal")
     }
 
+    /// Edwin is "typing" while an assistant job is queued or being worked.
+    static func assistantBusy(token: String) async throws -> Bool {
+        let data = try await request("GET",
+            "/wa_outbox?chat_jid=eq.\(assistantJid)&status=in.(pending,sending)&select=id&limit=1",
+            token: token)
+        let obj = try? JSONSerialization.jsonObject(with: data)
+        return ((obj as? [Any])?.isEmpty == false)
+    }
+
     /// Upload an attachment to storage; returns its public URL.
     static func uploadAttachment(userId: String, data: Data, ext: String, mime: String, token: String) async throws -> String {
         let path = "\(userId)/assistant/\(Int(Date().timeIntervalSince1970 * 1000)).\(ext)"
