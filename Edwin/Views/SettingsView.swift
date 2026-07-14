@@ -5,6 +5,8 @@ struct SettingsView: View {
     @EnvironmentObject var auth: AuthStore
     @EnvironmentObject var wa: WAStore
     @EnvironmentObject var cal: CalendarStore
+    @EnvironmentObject var storeKit: Store
+    @State private var showPaywall = false
     @State private var confirmSignOut = false
     @State private var showEmailSheet = false
     @State private var showCalendarPicker = false
@@ -105,6 +107,29 @@ struct SettingsView: View {
                     }
                 }
 
+                Section {
+                    Button { showPaywall = true } label: {
+                        HStack(spacing: 12) {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Theme.accent.opacity(0.12))
+                                .frame(width: 40, height: 40)
+                                .overlay(Image(systemName: "sparkles").font(.system(size: 17)).foregroundStyle(Theme.accent))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Edwin Pro")
+                                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(Theme.text)
+                                Text(storeKit.isPro ? "Active" : "7 days free, then from \(storeKit.quarterlyPerMonth ?? "£4.98")/mo")
+                                    .font(.system(size: 13, design: .rounded))
+                                    .foregroundStyle(storeKit.isPro ? Theme.success : Theme.textMuted)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Theme.textFaint)
+                        }
+                    }
+                }
+
                 Section("Preferences") {
                     Label("Notifications", systemImage: "bell")
                     Label("Privacy & data", systemImage: "checkmark.shield")
@@ -136,6 +161,7 @@ struct SettingsView: View {
                 }
             }
             .sheet(isPresented: $showEmailSheet) { EmailConnectSheet() }
+            .sheet(isPresented: $showPaywall) { PaywallView(onClose: { showPaywall = false }) }
             .sheet(isPresented: $showCalendarPicker) { CalendarPickerSheet() }
         .background(Theme.bg)
         .toolbar(.hidden, for: .tabBar)
