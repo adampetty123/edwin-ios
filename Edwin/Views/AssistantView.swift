@@ -24,23 +24,22 @@ struct AssistantChatView: View {
                             .id(m.id)
                     }
                     if thinking {
-                        HStack(spacing: 6) {
-                            ProgressView().controlSize(.small)
-                            Text("edwin is thinking\u{2026}")
-                                .font(.system(size: 13, design: .rounded))
-                                .foregroundStyle(Theme.textMuted)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 4)
-                        .id("thinking")
+                        TypingBubble()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 2)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            .id("thinking")
                     }
                 }
                 .padding(.horizontal, 16).padding(.vertical, 12)
             }
             .defaultScrollAnchor(.bottom)
             .onChange(of: msgs.count) {
-                thinking = false
+                withAnimation { thinking = false }
                 if let last = msgs.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
+            }
+            .onChange(of: thinking) {
+                if thinking { withAnimation { proxy.scrollTo("thinking", anchor: .bottom) } }
             }
         }
         .background(Theme.bg)
@@ -140,12 +139,35 @@ struct AssistantChatView: View {
         draft = ""
         pickedImage = nil
         pickedItem = nil
-        thinking = true
+        withAnimation { thinking = true }
         Task {
             try? await wa.sendToAssistant(text: text, imageData: image)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             await wa.refreshMessages(chatJid: WAClient.assistantJid)
         }
+    }
+}
+
+/// iMessage-style typing indicator: three dots bouncing inside Edwin's bubble.
+struct TypingBubble: View {
+    @State private var phase = 0
+    private let timer = Timer.publish(every: 0.28, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack(spacing: 5) {
+            ForEach(0..<3, id: \.self) { i in
+                Circle()
+                    .fill(Theme.textMuted)
+                    .frame(width: 8, height: 8)
+                    .scaleEffect(phase == i ? 1.0 : 0.55)
+                    .opacity(phase == i ? 1.0 : 0.45)
+                    .animation(.easeInOut(duration: 0.28), value: phase)
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 11)
+        .background(RoundedRectangle(cornerRadius: 18).fill(Theme.bubbleThem))
+        .onReceive(timer) { _ in phase = (phase + 1) % 3 }
+        .accessibilityLabel("Edwin is typing")
     }
 }
 
