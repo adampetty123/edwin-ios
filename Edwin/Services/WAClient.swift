@@ -91,6 +91,7 @@ struct WAMessage: Codable, Identifiable, Equatable {
     let mediaUrl: String?
     let reactions: [WAReaction]?
     let status: String?          // sent | delivered | read (from_me only)
+    let statusAt: Date?          // when it was delivered/seen
     let quotedMsgId: String?
     let quotedText: String?
     let quotedSender: String?
@@ -101,6 +102,7 @@ struct WAMessage: Codable, Identifiable, Equatable {
         case senderName = "sender_name", senderJid = "sender_jid", fromMe = "from_me"
         case mediaType = "media_type", mediaUrl = "media_url"
         case quotedMsgId = "quoted_msg_id", quotedText = "quoted_text", quotedSender = "quoted_sender"
+        case statusAt = "status_at"
     }
 }
 

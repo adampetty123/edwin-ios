@@ -285,7 +285,8 @@ struct ChatView: View {
                             message: m,
                             isGroup: chat.isGroup ?? false,
                             showSender: showSender(at: i),
-                            senderAvatarUrl: senderAvatar(m)
+                            senderAvatarUrl: senderAvatar(m),
+                            isLastOutgoing: m.fromMe && m.id == msgs.last(where: { $0.fromMe })?.id
                         )
                             .id(m.id)
                             .contextMenu { contextMenu(for: m) }
@@ -522,6 +523,7 @@ struct MessageBubble: View {
     let isGroup: Bool
     var showSender: Bool = true
     var senderAvatarUrl: String? = nil
+    var isLastOutgoing: Bool = false
 
     /// Incoming group messages get a pfp gutter; first-of-run shows the pfp,
     /// the rest keep a clear spacer so bubbles stay aligned.
@@ -554,12 +556,17 @@ struct MessageBubble: View {
         .frame(maxWidth: .infinity, alignment: message.fromMe ? .trailing : .leading)
     }
 
-    /// Time + read receipt live under the bubble, hugging its edge — like iMessage.
+    /// Time under the bubble; the last outgoing message carries the receipt
+    /// spelled out — "Seen at 14:32" / "Delivered at 14:32" — like iMessage.
     private var meta: some View {
         HStack(spacing: 3) {
             Text(message.ts.formatted(date: .omitted, time: .shortened))
                 .font(.system(size: 10.5, design: .rounded))
-            if message.fromMe {
+            if message.fromMe, let label = receiptLabel {
+                Text("· \(label)")
+                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(message.status == "read" ? Theme.accent : Theme.textFaint)
+            } else if message.fromMe {
                 Image(systemName: ticksIcon)
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(message.status == "read" ? Theme.bubbleMe : Theme.textFaint)
@@ -567,6 +574,17 @@ struct MessageBubble: View {
         }
         .foregroundStyle(Theme.textFaint)
         .padding(.horizontal, 4)
+    }
+
+    /// Spelled-out receipt for the newest outgoing message only.
+    private var receiptLabel: String? {
+        guard isLastOutgoing else { return nil }
+        let when = message.statusAt.map { " at " + $0.formatted(date: .omitted, time: .shortened) } ?? ""
+        switch message.status {
+        case "read": return "Seen\(when)"
+        case "delivered": return "Delivered\(when)"
+        default: return nil
+        }
     }
 
     private var bubble: some View {
