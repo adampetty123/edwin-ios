@@ -372,13 +372,11 @@ struct AssistantRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            Circle()
-                .fill(Theme.accent)
+            Image("EdwinAvatar")
+                .resizable()
+                .scaledToFill()
                 .frame(width: 48, height: 48)
-                .overlay(
-                    Text("e").font(.system(size: 26, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white).offset(y: -1)
-                )
+                .clipShape(Circle())
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text("Edwin").font(.system(size: 16, weight: .bold, design: .rounded))

@@ -55,6 +55,19 @@ struct AssistantChatView: View {
         .background(Theme.bg)
         .navigationTitle("Edwin")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // same pfp as the inbox row — Edwin looks like one person everywhere
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 8) {
+                    Image("EdwinAvatar")
+                        .resizable().scaledToFill()
+                        .frame(width: 30, height: 30)
+                        .clipShape(Circle())
+                    Text("Edwin")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                }
+            }
+        }
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 8) {
