@@ -322,7 +322,7 @@ struct ChatView: View {
             if chat.isGroup == true { await wa.refreshSenderAvatars() }
             while !Task.isCancelled {
                 await wa.refreshMessages(chatJid: chat.jid)
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                try? await Task.sleep(nanoseconds: wa.realtime.connected ? 15_000_000_000 : 3_000_000_000)
             }
         }
     }

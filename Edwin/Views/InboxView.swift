@@ -64,13 +64,15 @@ struct InboxView: View {
             await wa.ensureAssistant()
             PushManager.shared.enable()
             while !Task.isCancelled {
+                wa.startRealtime()
                 await PushManager.shared.syncIfNeeded(userId: auth.userId, accessToken: auth.accessToken)
                 await wa.refreshAccount()
                 await wa.refreshChats()
                 await wa.refreshDrafts()
                 // events Edwin added land in the real calendar within one cycle
                 await cal.processPendingEvents()
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                // realtime socket carries the instant updates; polling becomes a safety net
+                try? await Task.sleep(nanoseconds: wa.realtime.connected ? 20_000_000_000 : 5_000_000_000)
             }
         }
     }

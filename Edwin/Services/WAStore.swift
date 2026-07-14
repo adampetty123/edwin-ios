@@ -16,6 +16,21 @@ final class WAStore: ObservableObject {
 
     weak var auth: AuthStore?
     private var assistantReady = false
+    /// Live socket — when connected, polling drops to a slow safety net.
+    let realtime = RealtimeClient()
+
+    func startRealtime() {
+        guard let token else { return }
+        realtime.onChange = { [weak self] jid in
+            Task { @MainActor in
+                guard let self else { return }
+                if let jid { await self.refreshMessages(chatJid: jid) }
+                await self.refreshChats()
+                await self.refreshDrafts()
+            }
+        }
+        realtime.start(accessToken: token)
+    }
 
     var isConnected: Bool { account?.status == "connected" }
 
