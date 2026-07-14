@@ -8,6 +8,9 @@ struct SettingsView: View {
     @State private var confirmSignOut = false
     @State private var showEmailSheet = false
     @State private var showCalendarPicker = false
+    @State private var googleEmail: String?
+    @State private var googleBusy = false
+    @State private var googleError: String?
 
     // NOTE: no NavigationStack here — Settings is pushed onto the Inbox stack
     // from the gear button in the top-right corner.
@@ -81,19 +84,21 @@ struct SettingsView: View {
                     }
 
                     connectionRow(
-                        icon: "envelope.fill", tint: Color(hex: 0xEA4335), name: "Email",
-                        subtitle: "Gmail — summaries + smart replies",
-                        connected: false,
-                        busy: false,
-                        actionTitle: "Connect"
+                        icon: "envelope.fill", tint: Color(hex: 0xEA4335), name: "Google",
+                        subtitle: googleEmail.map { $0.isEmpty ? "Connected" : $0 }
+                            ?? "Gmail + Calendar — Edwin reads mail, adds events",
+                        connected: googleEmail != nil,
+                        busy: googleBusy,
+                        actionTitle: googleEmail != nil ? "Connected" : "Connect",
+                        disabled: googleEmail != nil
                     ) {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        showEmailSheet = true
+                        connectGoogle()
                     }
                 } header: {
                     Text("Connections")
                 } footer: {
-                    if let err = cal.lastError {
+                    if let err = googleError ?? cal.lastError {
                         Text(err).foregroundStyle(Theme.danger)
                     } else {
                         Text("Edwin uses these to answer availability and surface what needs you. Nothing is shared without your say-so.")
@@ -137,6 +142,29 @@ struct SettingsView: View {
         .task {
             // keep the calendar fresh whenever settings opens
             if cal.connected { await cal.sync() }
+            await refreshGoogle()
+        }
+    }
+
+    private func refreshGoogle() async {
+        guard let token = auth.accessToken else { return }
+        googleEmail = await GoogleAuth.status(userId: auth.userId, accessToken: token)
+    }
+
+    private func connectGoogle() {
+        guard let token = auth.accessToken, !googleBusy else { return }
+        googleBusy = true
+        googleError = nil
+        Task {
+            do {
+                try await GoogleAuth.connect(accessToken: token)
+                await refreshGoogle()
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } catch {
+                let msg = error.localizedDescription
+                if msg != "Cancelled." { googleError = msg }
+            }
+            googleBusy = false
         }
     }
 

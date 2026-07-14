@@ -70,6 +70,14 @@ final class AuthStore: ObservableObject {
         }
     }
 
+    /// Google sign-in: hosted OAuth hands back a refresh token; exchanging it
+    /// through the normal refresh path lands a full session.
+    func signInWithGoogle() async throws {
+        let refreshToken = try await GoogleAuth.signIn()
+        let session = try await SupabaseAuthClient.refresh(refreshToken: refreshToken)
+        apply(session)
+    }
+
     func signOut() async {
         if let token = accessToken {
             await SupabaseAuthClient.signOut(accessToken: token)

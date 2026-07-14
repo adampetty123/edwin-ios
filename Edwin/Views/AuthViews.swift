@@ -46,6 +46,7 @@ struct SignUpView: View {
 
             OrDivider().padding(.vertical, 2)
             AppleSignInButton(error: $error, label: .signUp)
+            GoogleSignInButton(error: $error)
         }
     }
 
@@ -103,6 +104,7 @@ struct SignInView: View {
 
             OrDivider().padding(.vertical, 2)
             AppleSignInButton(error: $error, label: .signIn)
+            GoogleSignInButton(error: $error)
         }
     }
 
