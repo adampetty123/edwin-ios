@@ -5,19 +5,21 @@ import EventKit
 
 struct MainTabView: View {
     var body: some View {
+        // Base (outline) SF Symbols only — the system fills the selected tab
+        // itself; hardcoding .fill variants makes every tab look heavy.
         if #available(iOS 26.0, *) {
             TabView {
                 Tab("Edwin", systemImage: "sparkles") { EdwinTab() }
-                Tab("Messages", systemImage: "bubble.left.and.bubble.right.fill") { InboxView() }
-                Tab("Email", systemImage: "envelope.fill") { EmailTab() }
+                Tab("Messages", systemImage: "message") { InboxView() }
+                Tab("Email", systemImage: "envelope") { EmailTab() }
                 Tab("Calendar", systemImage: "calendar") { CalendarTab() }
                 Tab(role: .search) { SearchTab() }
             }
         } else {
             TabView {
                 EdwinTab().tabItem { Label("Edwin", systemImage: "sparkles") }
-                InboxView().tabItem { Label("Messages", systemImage: "bubble.left.and.bubble.right.fill") }
-                EmailTab().tabItem { Label("Email", systemImage: "envelope.fill") }
+                InboxView().tabItem { Label("Messages", systemImage: "message") }
+                EmailTab().tabItem { Label("Email", systemImage: "envelope") }
                 CalendarTab().tabItem { Label("Calendar", systemImage: "calendar") }
                 SearchTab().tabItem { Label("Search", systemImage: "magnifyingglass") }
             }
