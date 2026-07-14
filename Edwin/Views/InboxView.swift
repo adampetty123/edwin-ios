@@ -62,7 +62,9 @@ struct InboxView: View {
         }
         .task {
             await wa.ensureAssistant()
+            PushManager.shared.enable()
             while !Task.isCancelled {
+                await PushManager.shared.syncIfNeeded(userId: auth.userId, accessToken: auth.accessToken)
                 await wa.refreshAccount()
                 await wa.refreshChats()
                 await wa.refreshDrafts()

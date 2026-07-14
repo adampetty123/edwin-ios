@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct EdwinApp: App {
+    @UIApplicationDelegateAdaptor(PushAppDelegate.self) var pushDelegate
     @StateObject private var auth = AuthStore()
     @StateObject private var wa = WAStore()
     @StateObject private var cal = CalendarStore()
