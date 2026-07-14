@@ -292,6 +292,7 @@ struct ChatView: View {
                             .id(m.id)
                             .contextMenu { contextMenu(for: m) }
                             .onTapGesture(count: 2) { quickHeart(m) }
+                            .swipeToReply { withAnimation(.snappy) { replyingTo = m } }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -444,6 +445,66 @@ struct ChatView: View {
                 sendState = .failed("Didn't send \u{2014} \(error.localizedDescription)")
             }
         }
+    }
+}
+
+/// WhatsApp-style swipe-to-reply: drag a message right, a reply arrow fades in
+/// behind it, a light haptic fires at the trigger point, and on release the
+/// bubble snaps back and the composer shows "replying to".
+private struct SwipeToReply: ViewModifier {
+    let onReply: () -> Void
+
+    @State private var offsetX: CGFloat = 0
+    @State private var armed = false   // crossed the trigger threshold
+
+    private let trigger: CGFloat = 52
+    private let maxDrag: CGFloat = 76
+
+    func body(content: Content) -> some View {
+        content
+            .offset(x: offsetX)
+            .background(alignment: .leading) {
+                Image(systemName: "arrowshape.turn.up.left.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(armed ? Theme.accent : Theme.textFaint)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Theme.surface))
+                    .opacity(min(1, Double(offsetX / trigger)))
+                    .scaleEffect(armed ? 1.0 : 0.75)
+                    .animation(.snappy(duration: 0.18), value: armed)
+            }
+            .gesture(
+                DragGesture(minimumDistance: 24, coordinateSpace: .local)
+                    .onChanged { v in
+                        // horizontal, rightward drags only — leave scrolling alone
+                        guard v.translation.width > 0,
+                              abs(v.translation.width) > abs(v.translation.height) else {
+                            if offsetX != 0 { offsetX = 0; armed = false }
+                            return
+                        }
+                        let x = v.translation.width
+                        // rubber-band past the trigger
+                        offsetX = x < trigger ? x : trigger + (x - trigger) * 0.25
+                        if offsetX > maxDrag { offsetX = maxDrag }
+                        let nowArmed = offsetX >= trigger
+                        if nowArmed != armed {
+                            armed = nowArmed
+                            if nowArmed { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+                        }
+                    }
+                    .onEnded { _ in
+                        let fire = armed
+                        withAnimation(.snappy(duration: 0.25)) { offsetX = 0 }
+                        armed = false
+                        if fire { onReply() }
+                    }
+            )
+    }
+}
+
+extension View {
+    func swipeToReply(_ onReply: @escaping () -> Void) -> some View {
+        modifier(SwipeToReply(onReply: onReply))
     }
 }
 
