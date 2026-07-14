@@ -1,4 +1,5 @@
 import SwiftUI
+import AVKit
 
 // MARK: - Connect WhatsApp (real pairing, Beeper-style)
 
@@ -445,6 +446,37 @@ struct ChatView: View {
     }
 }
 
+/// In-app playback for videos and voice notes — no more bouncing to Safari.
+struct MediaPlayerScreen: View {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+    @State private var player = AVPlayer()
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            VideoPlayer(player: player)
+                .ignoresSafeArea()
+            Button {
+                player.pause()
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(10)
+                    .background(Circle().fill(.black.opacity(0.55)))
+            }
+            .padding(.top, 8).padding(.trailing, 16)
+        }
+        .onAppear {
+            player.replaceCurrentItem(with: AVPlayerItem(url: url))
+            player.play()
+        }
+        .onDisappear { player.pause() }
+    }
+}
+
 struct DaySeparator: View {
     let date: Date
 
@@ -524,6 +556,13 @@ struct MessageBubble: View {
     var showSender: Bool = true
     var senderAvatarUrl: String? = nil
     var isLastOutgoing: Bool = false
+
+    @State private var playingMedia: PlayableMedia?
+
+    struct PlayableMedia: Identifiable {
+        let id = UUID()
+        let url: URL
+    }
 
     /// Incoming group messages get a pfp gutter; first-of-run shows the pfp,
     /// the rest keep a clear spacer so bubbles stay aligned.
@@ -657,9 +696,15 @@ struct MessageBubble: View {
                     }
                 }
             case "video":
-                Link(destination: url) { mediaChip(icon: "play.circle.fill", label: "Video") }
+                Button { playingMedia = PlayableMedia(url: url) } label: {
+                    mediaChip(icon: "play.circle.fill", label: "Video")
+                }
+                .fullScreenCover(item: $playingMedia) { m in MediaPlayerScreen(url: m.url) }
             case "audio":
-                Link(destination: url) { mediaChip(icon: "waveform", label: "Voice message") }
+                Button { playingMedia = PlayableMedia(url: url) } label: {
+                    mediaChip(icon: "waveform", label: "Voice message")
+                }
+                .fullScreenCover(item: $playingMedia) { m in MediaPlayerScreen(url: m.url) }
             case "document":
                 Link(destination: url) { mediaChip(icon: "doc.fill", label: "Document") }
             default:
