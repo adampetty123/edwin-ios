@@ -261,12 +261,27 @@ struct ChatRow: View {
             }
             .frame(width: 48, height: 48)
             .clipShape(Circle())
+            channelBadge
+                .overlay(Circle().stroke(Theme.bg, lineWidth: 2))
+                .offset(x: 2, y: 2)
+        }
+    }
+
+    @ViewBuilder
+    private var channelBadge: some View {
+        switch chat.channel {
+        case .whatsapp:
             Image("WhatsAppBadge")
                 .resizable()
                 .frame(width: 18, height: 18)
                 .background(Circle().fill(.white))
-                .overlay(Circle().stroke(Theme.bg, lineWidth: 2))
-                .offset(x: 2, y: 2)
+        case .imessage:
+            Circle()
+                .fill(Theme.imessage)
+                .frame(width: 18, height: 18)
+                .overlay(Image(systemName: "bubble.left.fill").font(.system(size: 8)).foregroundStyle(.white))
+        case .assistant:
+            EmptyView()
         }
     }
 

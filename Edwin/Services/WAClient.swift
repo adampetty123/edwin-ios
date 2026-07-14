@@ -19,6 +19,8 @@ struct WAAccount: Codable {
     }
 }
 
+enum MessageChannel { case whatsapp, imessage, assistant }
+
 struct WAChat: Codable, Identifiable, Equatable {
     let jid: String
     let name: String?
@@ -34,6 +36,17 @@ struct WAChat: Codable, Identifiable, Equatable {
     var id: String { jid }
     var displayName: String { (name?.isEmpty == false ? name! : jid.components(separatedBy: "@").first) ?? jid }
     var assistant: Bool { isAssistant == true || jid == "assistant@edwin" }
+
+    /// Which network this chat is on. Derived from the jid so it's never wrong:
+    /// WhatsApp jids end @s.whatsapp.net (DMs) or @g.us (groups). Everything the
+    /// WA bridge writes is WhatsApp; this stays correct when other channels land.
+    var channel: MessageChannel {
+        if assistant { return .assistant }
+        let j = jid.lowercased()
+        if j.hasSuffix("@s.whatsapp.net") || j.hasSuffix("@g.us") || j.hasSuffix("@lid") { return .whatsapp }
+        if j.hasSuffix("@imessage") || j.hasSuffix("@ichat") { return .imessage }
+        return .whatsapp  // WA bridge is the only ingest source today — default WhatsApp, never iMessage
+    }
 
     enum CodingKeys: String, CodingKey {
         case jid, name, unread, pinned
