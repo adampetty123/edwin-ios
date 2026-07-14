@@ -35,7 +35,7 @@ struct RootView: View {
             } else if !auth.onboarded {
                 OnboardingFlow()
             } else {
-                InboxView()
+                MainTabView()
             }
         }
         .animation(.easeInOut(duration: 0.25), value: auth.isAuthed)

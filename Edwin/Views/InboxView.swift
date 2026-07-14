@@ -35,21 +35,6 @@ struct InboxView: View {
             .background(Theme.bg)
             .navigationTitle("All Chats")
             .navigationBarTitleDisplayMode(.inline)
-            // default placement + minimize behavior = iOS 26 liquid glass
-            // search pill docked at the bottom edge
-            .searchable(text: $search, prompt: "Search chats and messages")
-            .liquidGlassSearch()
-            .onChange(of: search) {
-                let q = search
-                searchTask?.cancel()
-                guard q.trimmingCharacters(in: .whitespaces).count >= 2 else { messageHits = []; return }
-                searchTask = Task {
-                    try? await Task.sleep(nanoseconds: 300_000_000)  // debounce
-                    guard !Task.isCancelled else { return }
-                    let hits = await wa.searchMessages(q)
-                    if !Task.isCancelled { messageHits = hits }
-                }
-            }
             .toolbar {
                 // Edwin quick-access circle on the left, settings circle on the
                 // right, small centered title in line with both.

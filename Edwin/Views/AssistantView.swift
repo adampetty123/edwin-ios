@@ -68,7 +68,6 @@ struct AssistantChatView: View {
                 }
             }
         }
-        .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 8) {
                 if !wa.drafts.isEmpty {

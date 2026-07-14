@@ -89,6 +89,20 @@ final class CalendarStore: ObservableObject {
         try? await CalendarSync.setConnection(userId: userId, connected: false, token: token)
     }
 
+    /// Upcoming events grouped by day, for the Calendar tab.
+    func upcomingByDay(daysAhead: Int = 30) -> [(date: Date, events: [EKEvent])] {
+        guard connected else { return [] }
+        let end = Calendar.current.date(byAdding: .day, value: daysAhead, to: Date()) ?? Date()
+        if availableCalendars.isEmpty { loadCalendars() }
+        let watched: [EKCalendar]? = selectedIds.isEmpty
+            ? nil
+            : availableCalendars.filter { selectedIds.contains($0.calendarIdentifier) }
+        let pred = store.predicateForEvents(withStart: Date(), end: end, calendars: watched)
+        let events = store.events(matching: pred).sorted { $0.startDate < $1.startDate }
+        let grouped = Dictionary(grouping: events) { Calendar.current.startOfDay(for: $0.startDate) }
+        return grouped.keys.sorted().map { (date: $0, events: grouped[$0] ?? []) }
+    }
+
     /// Events Edwin created server-side: write them into the real device
     /// calendar, mark them added, then re-sync so they upload as real events.
     func processPendingEvents() async {
