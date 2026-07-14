@@ -473,8 +473,12 @@ private struct SwipeToReply: ViewModifier {
                     .scaleEffect(armed ? 1.0 : 0.75)
                     .animation(.snappy(duration: 0.18), value: armed)
             }
-            .gesture(
-                DragGesture(minimumDistance: 24, coordinateSpace: .local)
+            // simultaneousGesture: a plain .gesture loses the race against the
+            // ScrollView's pan recognizer, so the swipe never fired on device.
+            // Simultaneous lets both run; the axis guard below keeps vertical
+            // scrolls from dragging bubbles sideways.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 12, coordinateSpace: .local)
                     .onChanged { v in
                         // horizontal, rightward drags only — leave scrolling alone
                         guard v.translation.width > 0,
