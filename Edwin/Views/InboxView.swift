@@ -3,6 +3,7 @@ import SwiftUI
 struct InboxView: View {
     @EnvironmentObject var auth: AuthStore
     @EnvironmentObject var wa: WAStore
+    @EnvironmentObject var cal: CalendarStore
 
     @State private var search = ""
     @State private var messageHits: [WAMessage] = []
@@ -65,6 +66,8 @@ struct InboxView: View {
                 await wa.refreshAccount()
                 await wa.refreshChats()
                 await wa.refreshDrafts()
+                // events Edwin added land in the real calendar within one cycle
+                await cal.processPendingEvents()
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
             }
         }

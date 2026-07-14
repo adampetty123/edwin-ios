@@ -89,6 +89,43 @@ final class CalendarStore: ObservableObject {
         try? await CalendarSync.setConnection(userId: userId, connected: false, token: token)
     }
 
+    /// Events Edwin created server-side: write them into the real device
+    /// calendar, mark them added, then re-sync so they upload as real events.
+    func processPendingEvents() async {
+        guard connected, let token = auth?.accessToken, let userId = auth?.userId, !userId.isEmpty else { return }
+        guard let rows = try? await CalendarSync.pendingEvents(userId: userId, token: token), !rows.isEmpty else { return }
+        var addedAny = false
+        for row in rows {
+            guard let start = Self.parseISO(row.starts_at) else {
+                try? await CalendarSync.markPending(id: row.id, status: "failed", token: token)
+                continue
+            }
+            let ev = EKEvent(eventStore: store)
+            ev.title = row.title
+            ev.startDate = start
+            ev.endDate = row.ends_at.flatMap { Self.parseISO($0) } ?? start.addingTimeInterval(3600)
+            ev.isAllDay = row.all_day ?? false
+            ev.location = row.location
+            ev.calendar = store.defaultCalendarForNewEvents
+            do {
+                try store.save(ev, span: .thisEvent)
+                addedAny = true
+                try? await CalendarSync.markPending(id: row.id, status: "added", token: token)
+            } catch {
+                try? await CalendarSync.markPending(id: row.id, status: "failed", token: token)
+            }
+        }
+        if addedAny { await sync() }
+    }
+
+    static func parseISO(_ s: String) -> Date? {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: s) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: s)
+    }
+
     /// Pull the next 12 months of events and push them to Supabase.
     func sync() async {
         guard connected, let token = auth?.accessToken, let userId = auth?.userId, !userId.isEmpty else { return }
@@ -149,6 +186,30 @@ enum CalendarSync {
         guard let http = resp as? HTTPURLResponse, http.statusCode < 400 else {
             throw AuthError.server("Calendar sync error \((resp as? HTTPURLResponse)?.statusCode ?? 0).")
         }
+    }
+
+    struct PendingEvent: Codable {
+        let id: Int
+        let title: String
+        let starts_at: String
+        let ends_at: String?
+        let all_day: Bool?
+        let location: String?
+    }
+
+    /// Events Edwin queued for the device calendar.
+    static func pendingEvents(userId: String, token: String) async throws -> [PendingEvent] {
+        var r = URLRequest(url: URL(string: rest + "/assistant_calendar_pending?user_id=eq.\(userId)&status=eq.pending&select=id,title,starts_at,ends_at,all_day,location&order=id.asc&limit=20")!)
+        r.setValue(SupabaseAuthClient.anonKey, forHTTPHeaderField: "apikey")
+        r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let http = resp as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        return (try? JSONDecoder().decode([PendingEvent].self, from: data)) ?? []
+    }
+
+    static func markPending(id: Int, status: String, token: String) async throws {
+        try await req("PATCH", "/assistant_calendar_pending?id=eq.\(id)", token: token,
+                      body: ["status": status], prefer: "return=minimal")
     }
 
     /// Replace the user's synced window: clear then upsert (tolerates dupes).
