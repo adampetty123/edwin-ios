@@ -448,17 +448,19 @@ struct ChatView: View {
     }
 }
 
-/// WhatsApp-style swipe-to-reply: drag a message right, a reply arrow fades in
-/// behind it, a light haptic fires at the trigger point, and on release the
-/// bubble snaps back and the composer shows "replying to".
+/// WhatsApp-style swipe-to-reply. A SwiftUI DragGesture — even
+/// simultaneousGesture — loses reliably to the ScrollView's own pan on device,
+/// so this drives the offset from a real UIPanGestureRecognizer whose delegate
+/// (a) recognizes simultaneously with the scroll view and (b) only begins when
+/// the drag is mostly horizontal and rightward. That combination actually fires.
 private struct SwipeToReply: ViewModifier {
     let onReply: () -> Void
 
     @State private var offsetX: CGFloat = 0
-    @State private var armed = false   // crossed the trigger threshold
+    @State private var armed = false
 
     private let trigger: CGFloat = 52
-    private let maxDrag: CGFloat = 76
+    private let maxDrag: CGFloat = 74
 
     func body(content: Content) -> some View {
         content
@@ -473,21 +475,11 @@ private struct SwipeToReply: ViewModifier {
                     .scaleEffect(armed ? 1.0 : 0.75)
                     .animation(.snappy(duration: 0.18), value: armed)
             }
-            // simultaneousGesture: a plain .gesture loses the race against the
-            // ScrollView's pan recognizer, so the swipe never fired on device.
-            // Simultaneous lets both run; the axis guard below keeps vertical
-            // scrolls from dragging bubbles sideways.
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 12, coordinateSpace: .local)
-                    .onChanged { v in
-                        // horizontal, rightward drags only — leave scrolling alone
-                        guard v.translation.width > 0,
-                              abs(v.translation.width) > abs(v.translation.height) else {
-                            if offsetX != 0 { offsetX = 0; armed = false }
-                            return
-                        }
-                        let x = v.translation.width
-                        // rubber-band past the trigger
+            .overlay(
+                PanReader { phase, tx in
+                    switch phase {
+                    case .changed:
+                        let x = max(0, tx)
                         offsetX = x < trigger ? x : trigger + (x - trigger) * 0.25
                         if offsetX > maxDrag { offsetX = maxDrag }
                         let nowArmed = offsetX >= trigger
@@ -495,13 +487,13 @@ private struct SwipeToReply: ViewModifier {
                             armed = nowArmed
                             if nowArmed { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
                         }
-                    }
-                    .onEnded { _ in
+                    case .ended:
                         let fire = armed
                         withAnimation(.snappy(duration: 0.25)) { offsetX = 0 }
                         armed = false
                         if fire { onReply() }
                     }
+                }
             )
     }
 }
@@ -509,6 +501,59 @@ private struct SwipeToReply: ViewModifier {
 extension View {
     func swipeToReply(_ onReply: @escaping () -> Void) -> some View {
         modifier(SwipeToReply(onReply: onReply))
+    }
+}
+
+/// Transparent overlay hosting a horizontal-only UIPanGestureRecognizer that
+/// coexists with the enclosing scroll view.
+private struct PanReader: UIViewRepresentable {
+    enum Phase { case changed, ended }
+    let onPan: (Phase, CGFloat) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onPan: onPan) }
+
+    func makeUIView(context: Context) -> UIView {
+        let v = PassthroughView()
+        let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handle(_:)))
+        pan.delegate = context.coordinator
+        v.addGestureRecognizer(pan)
+        return v
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) { context.coordinator.onPan = onPan }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var onPan: (Phase, CGFloat) -> Void
+        init(onPan: @escaping (Phase, CGFloat) -> Void) { self.onPan = onPan }
+
+        @objc func handle(_ g: UIPanGestureRecognizer) {
+            let tx = g.translation(in: g.view).x
+            switch g.state {
+            case .changed: onPan(.changed, tx)
+            case .ended, .cancelled, .failed: onPan(.ended, tx)
+            default: break
+            }
+        }
+
+        // run alongside the scroll view's pan
+        func gestureRecognizer(_ g: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+
+        // only claim mostly-horizontal, rightward drags — vertical scroll passes through
+        func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
+            guard let pan = g as? UIPanGestureRecognizer else { return false }
+            let v = pan.velocity(in: pan.view)
+            return v.x > 0 && abs(v.x) > abs(v.y)
+        }
+    }
+}
+
+/// A view that never swallows touches itself — taps and long-press reach the
+/// bubble underneath; only the attached pan recognizer acts.
+private final class PassthroughView: UIView {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        return hit === self ? nil : hit
     }
 }
 
