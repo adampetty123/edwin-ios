@@ -290,9 +290,13 @@ struct ChatView: View {
                             isLastOutgoing: m.fromMe && m.id == msgs.last(where: { $0.fromMe })?.id
                         )
                             .id(m.id)
-                            .contextMenu { contextMenu(for: m) }
+                            // order matters: double-tap and swipe INSIDE, context
+                            // menu OUTERMOST — a tap gesture registered after
+                            // .contextMenu starves the system long-press, which
+                            // is why the hold menu never appeared on device.
                             .onTapGesture(count: 2) { quickHeart(m) }
                             .swipeToReply { withAnimation(.snappy) { replyingTo = m } }
+                            .contextMenu { contextMenu(for: m) }
                     }
                 }
                 .padding(.horizontal, 16)
