@@ -11,6 +11,7 @@ struct AssistantChatView: View {
     @State private var thinking = false
     @State private var pickedItem: PhotosPickerItem?
     @State private var pickedImage: Data?
+    @State private var replyingTo: WAMessage?
 
     private var msgs: [WAMessage] { wa.messages[WAClient.assistantJid] ?? [] }
 
@@ -26,6 +27,11 @@ struct AssistantChatView: View {
                         if showDay(at: i) { DaySeparator(date: m.ts) }
                         MessageBubble(message: m, isGroup: false)
                             .id(m.id)
+                            .swipeToReply { withAnimation(.snappy) { replyingTo = m } }
+                            .contextMenu {
+                                Button { replyingTo = m } label: { Label("Reply", systemImage: "arrowshape.turn.up.left") }
+                                Button { UIPasteboard.general.string = m.text } label: { Label("Copy", systemImage: "doc.on.doc") }
+                            }
                     }
                     if showTyping {
                         TypingBubble()
@@ -101,6 +107,25 @@ struct AssistantChatView: View {
 
     private var composer: some View {
         VStack(spacing: 6) {
+            if let r = replyingTo {
+                HStack(spacing: 8) {
+                    RoundedRectangle(cornerRadius: 1.5).fill(Theme.accent).frame(width: 3, height: 30)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(r.fromMe ? "You" : "Edwin")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Theme.accent)
+                        Text(r.text).font(.system(size: 13, design: .rounded))
+                            .foregroundStyle(Theme.textMuted).lineLimit(1)
+                    }
+                    Spacer()
+                    Button { replyingTo = nil } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.textFaint)
+                    }
+                }
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Theme.surface))
+                .padding(.horizontal, 12)
+            }
             if let data = pickedImage, let ui = UIImage(data: data) {
                 HStack {
                     Image(uiImage: ui)
@@ -160,13 +185,17 @@ struct AssistantChatView: View {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         let image = pickedImage
         guard !text.isEmpty || image != nil else { return }
+        let quoted = replyingTo
         draft = ""
         pickedImage = nil
         pickedItem = nil
+        replyingTo = nil
         withAnimation { thinking = true }
         Task {
             do {
-                try await wa.sendToAssistant(text: text, imageData: image)
+                try await wa.sendToAssistant(text: text, imageData: image,
+                                             quotedText: quoted?.text,
+                                             quotedSender: quoted.map { $0.fromMe ? "You" : "Edwin" })
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 await wa.refreshMessages(chatJid: WAClient.assistantJid)
                 await wa.refreshAssistantBusy()

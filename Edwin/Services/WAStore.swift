@@ -112,7 +112,7 @@ final class WAStore: ObservableObject {
         await refreshChats()
     }
 
-    func sendToAssistant(text: String, imageData: Data? = nil) async throws {
+    func sendToAssistant(text: String, imageData: Data? = nil, quotedText: String? = nil, quotedSender: String? = nil) async throws {
         guard let token, let userId = auth?.userId, !userId.isEmpty else {
             throw AuthError.server("Not signed in.")
         }
@@ -120,7 +120,8 @@ final class WAStore: ObservableObject {
         if let imageData {
             mediaUrl = try await WAClient.uploadAttachment(userId: userId, data: imageData, ext: "jpg", mime: "image/jpeg", token: token)
         }
-        try await WAClient.sendToAssistant(userId: userId, text: text, mediaUrl: mediaUrl, mediaType: mediaUrl != nil ? "image" : nil, token: token)
+        try await WAClient.sendToAssistant(userId: userId, text: text, mediaUrl: mediaUrl, mediaType: mediaUrl != nil ? "image" : nil,
+                                           quotedText: quotedText, quotedSender: quotedSender, token: token)
     }
 
     func refreshDrafts() async {

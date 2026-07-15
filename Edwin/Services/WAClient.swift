@@ -228,15 +228,20 @@ enum WAClient {
     }
 
     /// Owner speaks to Edwin: echo their message instantly, then queue the job.
-    static func sendToAssistant(userId: String, text: String, mediaUrl: String? = nil, mediaType: String? = nil, token: String) async throws {
+    static func sendToAssistant(userId: String, text: String, mediaUrl: String? = nil, mediaType: String? = nil,
+                                quotedText: String? = nil, quotedSender: String? = nil, token: String) async throws {
         let mid = "user-\(Int(Date().timeIntervalSince1970 * 1000))"
         var msg: [String: Any] = ["user_id": userId, "chat_jid": assistantJid, "msg_id": mid,
                                   "sender_jid": "me", "sender_name": "You", "from_me": true,
                                   "text": text.isEmpty ? "[photo]" : text, "ts": iso(Date())]
         if let mediaUrl { msg["media_url"] = mediaUrl; msg["media_type"] = mediaType ?? "image" }
+        if let quotedText { msg["quoted_text"] = String(quotedText.prefix(300)); msg["quoted_sender"] = quotedSender ?? "Edwin" }
         _ = try await request("POST", "/wa_messages", token: token,
             body: [msg], prefer: "resolution=ignore-duplicates,return=minimal")
-        let jobText = mediaUrl != nil ? "\(text)\n[attached image: \(mediaUrl!)]" : text
+        var jobText = mediaUrl != nil ? "\(text)\n[attached image: \(mediaUrl!)]" : text
+        if let quotedText {
+            jobText = "[replying to \(quotedSender ?? "Edwin"): \"\(String(quotedText.prefix(200)))\"]\n\(jobText)"
+        }
         _ = try await request("POST", "/wa_outbox", token: token,
             body: [["user_id": userId, "chat_jid": assistantJid, "text": jobText, "kind": "assistant"]],
             prefer: "return=minimal")
