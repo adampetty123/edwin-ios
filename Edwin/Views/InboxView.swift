@@ -521,7 +521,7 @@ struct AssistantRow: View {
                 HStack(spacing: 6) {
                     Text("Edwin").font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundStyle(Theme.text)
-                    Text("YOUR ASSISTANT")
+                    Text("Your assistant")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .foregroundStyle(Theme.accent)
                         .padding(.horizontal, 6).padding(.vertical, 2)

@@ -306,7 +306,7 @@ struct DraftCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "paperplane.fill").font(.system(size: 11)).foregroundStyle(Theme.accent)
-                Text("DRAFT TO \(draft.chatName?.uppercased() ?? "CONTACT")")
+                Text("Draft to \(draft.chatName ?? "contact")")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(Theme.accent)
                     .lineLimit(1)

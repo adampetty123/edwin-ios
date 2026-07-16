@@ -50,7 +50,7 @@ struct PaywallView: View {
 
     private var header: some View {
         HStack {
-            Text("EDWIN PRO")
+            Text("Edwin Pro")
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .kerning(1.2)
                 .foregroundStyle(Theme.accent)

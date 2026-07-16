@@ -13,7 +13,7 @@ struct SignUpView: View {
 
     var body: some View {
         AuthFormScaffold(
-            eyebrow: "CREATE ACCOUNT",
+            eyebrow: "Create account",
             title: "Let's get you set up.",
             subtitle: "One account, all your messaging in one place."
         ) {
@@ -76,7 +76,7 @@ struct SignInView: View {
 
     var body: some View {
         AuthFormScaffold(
-            eyebrow: "WELCOME BACK",
+            eyebrow: "Welcome back",
             title: "Sign in.",
             subtitle: "Pick up right where you left off."
         ) {

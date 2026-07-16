@@ -28,7 +28,7 @@ struct ConnectWhatsAppView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     iconTile.padding(.top, 20).padding(.bottom, 20)
 
-                    Text("CONNECT WHATSAPP")
+                    Text("Connect WhatsApp")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .kerning(0.5)
                         .foregroundStyle(Theme.accent)
@@ -113,7 +113,7 @@ struct ConnectWhatsAppView: View {
 
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("WAITING FOR LINK")
+                Text("Waiting for link")
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Theme.textMuted)
             }
@@ -148,7 +148,7 @@ struct ConnectWhatsAppView: View {
                 .foregroundStyle(Theme.accent)
                 .contentTransition(.numericText())
                 .animation(.snappy, value: value)
-            Text(label.uppercased())
+            Text(label)
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Theme.textMuted)
         }

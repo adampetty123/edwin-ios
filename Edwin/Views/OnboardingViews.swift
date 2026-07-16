@@ -72,7 +72,7 @@ struct ConnectChannelView: View {
             iconTile
                 .padding(.bottom, 24)
 
-            Text("CONNECT \(name.uppercased())")
+            Text("Connect \(name)")
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .kerning(0.5)
                 .foregroundStyle(Theme.accent)
