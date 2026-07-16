@@ -87,7 +87,6 @@ struct AssistantChatView: View {
                 }
                 composer
             }
-            .background(.ultraThinMaterial)
         }
         .task {
             await wa.markRead(chatJid: chat.jid)
