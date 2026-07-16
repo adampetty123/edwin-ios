@@ -161,8 +161,8 @@ struct InboxView: View {
                     ForEach(unifiedItems) { item in
                         switch item {
                         case .chat(let chat):
-                            NavigationLink(value: chat) { ChatRow(chat: chat) }
-                                .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
+                            NavigationLink(value: chat) { ChatRow(chat: chat, senderAvatar: wa.senderAvatars[chat.lastSenderJid ?? ""]) }
+                                .listRowInsets(EdgeInsets(top: 14, leading: 20, bottom: 14, trailing: 20))
                                 .listRowSeparatorTint(Theme.border)
                                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                                     Button(role: .destructive) {
@@ -176,7 +176,7 @@ struct InboxView: View {
                                 }
                         case .email(let email):
                             NavigationLink(value: email) { UnifiedEmailRow(email: email) }
-                                .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
+                                .listRowInsets(EdgeInsets(top: 14, leading: 20, bottom: 14, trailing: 20))
                                 .listRowSeparatorTint(Theme.border)
                                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                                     Button(role: .destructive) {
@@ -202,8 +202,8 @@ struct InboxView: View {
             if !chatMatches.isEmpty {
                 Section("Chats") {
                     ForEach(chatMatches) { chat in
-                        NavigationLink(value: chat) { ChatRow(chat: chat) }
-                            .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
+                        NavigationLink(value: chat) { ChatRow(chat: chat, senderAvatar: wa.senderAvatars[chat.lastSenderJid ?? ""]) }
+                            .listRowInsets(EdgeInsets(top: 14, leading: 20, bottom: 14, trailing: 20))
                     }
                 }
             }
@@ -214,7 +214,7 @@ struct InboxView: View {
                             NavigationLink(value: c) {
                                 MessageHitRow(chat: c, hit: hit, query: search)
                             }
-                            .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
+                            .listRowInsets(EdgeInsets(top: 14, leading: 20, bottom: 14, trailing: 20))
                         }
                     }
                 }
@@ -223,7 +223,7 @@ struct InboxView: View {
                 Section("Email") {
                     ForEach(emailMatches) { email in
                         NavigationLink(value: email) { UnifiedEmailRow(email: email) }
-                            .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
+                            .listRowInsets(EdgeInsets(top: 14, leading: 20, bottom: 14, trailing: 20))
                     }
                 }
             }
@@ -273,16 +273,18 @@ struct InboxView: View {
 
 struct ChatRow: View {
     let chat: WAChat
+    var senderAvatar: String? = nil
 
     private var unread: Bool { (chat.unread ?? 0) > 0 }
+    private var isGroup: Bool { chat.isGroup == true }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             avatar
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(chat.displayName)
-                        .font(.system(size: 16, weight: unread ? .bold : .semibold, design: .rounded))
+                        .font(.system(size: 15, weight: unread ? .bold : .semibold, design: .rounded))
                         .foregroundStyle(Theme.text)
                         .lineLimit(1)
                     Spacer()
@@ -292,7 +294,7 @@ struct ChatRow: View {
                 }
                 HStack(alignment: .center) {
                     Text(preview)
-                        .font(.system(size: 15, design: .rounded))
+                        .font(.system(size: 13.5, design: .rounded))
                         .foregroundStyle(unread ? Theme.text : Theme.textMuted)
                         .lineLimit(1)
                     Spacer()
@@ -346,10 +348,55 @@ struct ChatRow: View {
             }
             .frame(width: 48, height: 48)
             .clipShape(Circle())
-            channelBadge
-                .overlay(Circle().stroke(Theme.bg, lineWidth: 2))
-                .offset(x: 2, y: 2)
+            // groups: who sent the latest message (Beeper-style); 1:1: network badge
+            if isGroup {
+                groupSenderChip
+                    .overlay(Circle().stroke(Theme.bg, lineWidth: 2))
+                    .offset(x: 3, y: 3)
+            } else {
+                channelBadge
+                    .overlay(Circle().stroke(Theme.bg, lineWidth: 2))
+                    .offset(x: 2, y: 2)
+            }
         }
+    }
+
+    @ViewBuilder
+    private var groupSenderChip: some View {
+        Group {
+            if let urlStr = senderAvatar, let url = URL(string: urlStr) {
+                AsyncImage(url: url) { phase in
+                    if case .success(let img) = phase { img.resizable().scaledToFill() }
+                    else { senderInitialChip }
+                }
+            } else {
+                senderInitialChip
+            }
+        }
+        .frame(width: 22, height: 22)
+        .clipShape(Circle())
+    }
+
+    private var senderInitialChip: some View {
+        Circle()
+            .fill(senderColor)
+            .overlay(
+                Text(senderInitials)
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+            )
+    }
+
+    private var senderInitials: String {
+        let n = (chat.lastSender == "You" ? "" : chat.lastSender) ?? ""
+        let j = n.split(separator: " ").prefix(2).compactMap { $0.first.map(String.init) }.joined().uppercased()
+        return j.isEmpty ? "?" : j
+    }
+
+    private var senderColor: Color {
+        let palette: [UInt32] = [0xA65468, 0x5E67A0, 0x3F8A7E, 0x4A6D9C, 0xA9803F, 0x7E5EA0, 0x5E8AA0]
+        let key = chat.lastSenderJid ?? chat.lastSender ?? chat.jid
+        return Color(hex: palette[abs(key.hashValue) % palette.count])
     }
 
     @ViewBuilder

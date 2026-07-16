@@ -27,6 +27,7 @@ struct WAChat: Codable, Identifiable, Equatable {
     let lastMessageText: String?
     let lastMessageAt: Date?
     let lastSender: String?
+    let lastSenderJid: String?
     var unread: Int?
     let isGroup: Bool?
     let avatarUrl: String?
@@ -53,6 +54,7 @@ struct WAChat: Codable, Identifiable, Equatable {
         case lastMessageText = "last_message_text"
         case lastMessageAt = "last_message_at"
         case lastSender = "last_sender"
+        case lastSenderJid = "last_sender_jid"
         case isGroup = "is_group"
         case avatarUrl = "avatar_url"
         case isAssistant = "is_assistant"
