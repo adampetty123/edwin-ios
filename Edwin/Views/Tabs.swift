@@ -21,9 +21,7 @@ struct MainTabView: View {
                 if let edwin = wa.assistantChat {
                     AssistantChatView(chat: edwin)
                 } else {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Theme.bg)
+                    LoadingView()
                 }
             }
             .toolbar {

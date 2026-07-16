@@ -31,9 +31,7 @@ struct RootView: View {
     var body: some View {
         Group {
             if auth.isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Theme.bg)
+                LoadingView()
             } else if !auth.isAuthed {
                 WelcomeView()
             } else if !auth.onboarded {
