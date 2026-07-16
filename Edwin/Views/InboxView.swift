@@ -5,7 +5,7 @@ struct InboxView: View {
     @EnvironmentObject var wa: WAStore
     @EnvironmentObject var cal: CalendarStore
 
-    @StateObject private var emailStore = EmailStore()
+    @EnvironmentObject var emailStore: EmailStore
 
     @State private var search = ""
     @State private var messageHits: [WAMessage] = []
@@ -72,10 +72,6 @@ struct InboxView: View {
             .navigationTitle("All Chats")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $search, prompt: "Search chats, messages and email")
-            .navigationDestination(for: Email.self) { email in
-                EmailDetailView(email: email)
-                    .environmentObject(emailStore)
-            }
             .onChange(of: search) {
                 let q = search
                 searchTask?.cancel()

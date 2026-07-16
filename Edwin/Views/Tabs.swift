@@ -8,15 +8,19 @@ struct MainTabView: View {
     @EnvironmentObject var wa: WAStore
     @EnvironmentObject var cal: CalendarStore
 
-    @State private var showChats = false
-    @State private var showSettings = false
+    /// One typed path for every push — mixing isPresented-bindings with
+    /// value pushes on the same stack causes the "opens then bounces back"
+    /// navigation bug this replaces.
+    private enum HomeRoute: Hashable { case chats, settings }
+    @State private var path = NavigationPath()
+    @StateObject private var emailStore = EmailStore()
 
     private var unreadTotal: Int {
         wa.chats.filter { !$0.assistant }.reduce(0) { $0 + ($1.unread ?? 0) }
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if let edwin = wa.assistantChat {
                     AssistantChatView(chat: edwin)
@@ -29,7 +33,7 @@ struct MainTabView: View {
                 // liquid glass itself; our old Theme.surface circle was a grey
                 // fill sitting inside that, hence the double-background look
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { showChats = true } label: {
+                    Button { path.append(HomeRoute.chats) } label: {
                         Image(systemName: "bubble.left.and.bubble.right")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Theme.text)
@@ -45,7 +49,7 @@ struct MainTabView: View {
                     .accessibilityLabel(unreadTotal > 0 ? "All chats, \(unreadTotal) unread" : "All chats")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showSettings = true } label: {
+                    Button { path.append(HomeRoute.settings) } label: {
                         Image(systemName: "gearshape")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Theme.text)
@@ -59,15 +63,24 @@ struct MainTabView: View {
                     .accessibilityLabel("Settings")
                 }
             }
-            .navigationDestination(isPresented: $showChats) { InboxView() }
-            .navigationDestination(isPresented: $showSettings) { SettingsView() }
+            .navigationDestination(for: HomeRoute.self) { route in
+                switch route {
+                case .chats: InboxView()
+                case .settings: SettingsView()
+                }
+            }
             .navigationDestination(for: WAChat.self) { chat in
                 if chat.assistant { AssistantChatView(chat: chat) }
                 else { ChatView(chat: chat) }
             }
+            .navigationDestination(for: Email.self) { email in
+                EmailDetailView(email: email)
+            }
         }
+        .environmentObject(emailStore)
         .task {
             // app-wide background work (used to live on the Messages tab)
+            emailStore.auth = auth
             await wa.ensureAssistant()
             await wa.refreshChats()
             PushManager.shared.enable()
