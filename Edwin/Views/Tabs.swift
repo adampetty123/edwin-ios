@@ -37,14 +37,6 @@ struct MainTabView: View {
                         Image(systemName: "bubble.left.and.bubble.right")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Theme.text)
-                            .overlay(alignment: .topTrailing) {
-                                if unreadTotal > 0 {
-                                    Circle()
-                                        .fill(Theme.accent)
-                                        .frame(width: 8, height: 8)
-                                        .offset(x: 4, y: -4)
-                                }
-                            }
                     }
                     .accessibilityLabel(unreadTotal > 0 ? "All chats, \(unreadTotal) unread" : "All chats")
                 }
@@ -53,12 +45,6 @@ struct MainTabView: View {
                         Image(systemName: "gearshape")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Theme.text)
-                            .overlay(alignment: .topTrailing) {
-                                Circle()
-                                    .fill(wa.isConnected ? Theme.success : Theme.textFaint)
-                                    .frame(width: 7, height: 7)
-                                    .offset(x: 3, y: -3)
-                            }
                     }
                     .accessibilityLabel("Settings")
                 }
