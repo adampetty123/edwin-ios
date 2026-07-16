@@ -25,22 +25,20 @@ struct MainTabView: View {
                 }
             }
             .toolbar {
+                // bare icons — the system wraps toolbar buttons in circular
+                // liquid glass itself; our old Theme.surface circle was a grey
+                // fill sitting inside that, hence the double-background look
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showChats = true } label: {
-                        Circle()
-                            .fill(Theme.surface)
-                            .frame(width: 32, height: 32)
-                            .overlay(
-                                Image(systemName: "bubble.left.and.bubble.right.fill")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(Theme.textMuted)
-                            )
+                        Image(systemName: "bubble.left.and.bubble.right")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.text)
                             .overlay(alignment: .topTrailing) {
                                 if unreadTotal > 0 {
                                     Circle()
                                         .fill(Theme.accent)
-                                        .frame(width: 9, height: 9)
-                                        .overlay(Circle().stroke(Theme.bg, lineWidth: 1.5))
+                                        .frame(width: 8, height: 8)
+                                        .offset(x: 4, y: -4)
                                 }
                             }
                     }
@@ -48,19 +46,14 @@ struct MainTabView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showSettings = true } label: {
-                        Circle()
-                            .fill(Theme.surface)
-                            .frame(width: 32, height: 32)
-                            .overlay(
-                                Image(systemName: "gearshape.fill")
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(Theme.textMuted)
-                            )
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.text)
                             .overlay(alignment: .topTrailing) {
                                 Circle()
                                     .fill(wa.isConnected ? Theme.success : Theme.textFaint)
-                                    .frame(width: 8, height: 8)
-                                    .overlay(Circle().stroke(Theme.bg, lineWidth: 1.5))
+                                    .frame(width: 7, height: 7)
+                                    .offset(x: 3, y: -3)
                             }
                     }
                     .accessibilityLabel("Settings")
