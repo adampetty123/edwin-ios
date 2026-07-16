@@ -84,6 +84,13 @@ final class WAStore: ObservableObject {
         await refreshAccount()
     }
 
+    /// Swipe-to-delete in All Chats: hide the chat and drop it locally.
+    func hideChat(_ chat: WAChat) async {
+        guard let token, let userId = auth?.userId, !userId.isEmpty else { return }
+        chats.removeAll { $0.jid == chat.jid }
+        try? await WAClient.hideChat(userId: userId, jid: chat.jid, token: token)
+    }
+
     func refreshChats() async {
         guard let token else { return }
         if let c = try? await WAClient.chats(token: token), c != chats {

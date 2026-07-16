@@ -54,6 +54,22 @@ final class EmailStore: ObservableObject {
         loaded = true
     }
 
+    /// Swipe-to-delete: queue a gmail bin server-side, drop locally right away.
+    func delete(_ email: Email) async {
+        guard let token = auth?.accessToken, let userId = auth?.userId else { return }
+        emails.removeAll { $0.id == email.id }
+        var req = URLRequest(url: URL(string: "\(Self.rest)/email_actions")!)
+        req.httpMethod = "POST"
+        req.setValue(SupabaseAuthClient.anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("return=minimal", forHTTPHeaderField: "Prefer")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: [[
+            "user_id": userId, "gmail_id": email.gmailId, "action": "delete",
+        ]])
+        _ = try? await URLSession.shared.data(for: req)
+    }
+
     /// Optimistically mark read in the app (gmail-side read state comes later).
     func markRead(_ email: Email) async {
         guard email.unread, let token = auth?.accessToken else { return }

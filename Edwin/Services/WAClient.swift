@@ -154,7 +154,7 @@ enum WAClient {
     }
 
     static func chats(token: String) async throws -> [WAChat] {
-        let data = try await request("GET", "/wa_chats?select=*&order=last_message_at.desc.nullslast&limit=200", token: token)
+        let data = try await request("GET", "/wa_chats?select=*&hidden=not.is.true&order=last_message_at.desc.nullslast&limit=200", token: token)
         return try decoder.decode([WAChat].self, from: data)
     }
 
@@ -225,6 +225,17 @@ enum WAClient {
                     "pinned": true, "last_message_text": welcome, "last_message_at": iso(Date()),
                     "last_sender": "Edwin"]],
             prefer: "resolution=merge-duplicates,return=minimal")
+    }
+
+    /// Hide a chat from the app's lists (swipe-to-delete in All Chats).
+    static func hideChat(userId: String, jid: String, token: String) async throws {
+        var req = URLRequest(url: URL(string: rest + "/wa_chats?user_id=eq.\(userId)&jid=eq.\(jid.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? jid)")!)
+        req.httpMethod = "PATCH"
+        req.setValue(SupabaseAuthClient.anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["hidden": true])
+        _ = try await URLSession.shared.data(for: req)
     }
 
     /// Owner speaks to Edwin: echo their message instantly, then queue the job.

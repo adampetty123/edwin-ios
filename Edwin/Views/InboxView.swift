@@ -140,10 +140,20 @@ struct InboxView: View {
                             NavigationLink(value: chat) { ChatRow(chat: chat) }
                                 .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
                                 .listRowSeparatorTint(Theme.border)
+                                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        Task { await wa.hideChat(chat) }
+                                    } label: { Label("Delete", systemImage: "trash") }
+                                }
                         case .email(let email):
                             NavigationLink(value: email) { UnifiedEmailRow(email: email) }
                                 .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
                                 .listRowSeparatorTint(Theme.border)
+                                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        Task { await emailStore.delete(email) }
+                                    } label: { Label("Delete", systemImage: "trash") }
+                                }
                         }
                     }
                 }
