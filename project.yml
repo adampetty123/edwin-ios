@@ -19,7 +19,9 @@ targets:
       properties:
         com.apple.developer.applesignin: [Default]
         aps-environment: production
-        com.apple.developer.usernotifications.communication: true
+        # com.apple.developer.usernotifications.communication: true
+        # ^ re-enable once the capability is ticked on the app id in the
+        #   developer portal (API can't set it) and the profile is regenerated
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.flowjam.iris
