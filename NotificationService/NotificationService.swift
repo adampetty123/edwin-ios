@@ -51,7 +51,14 @@ final class NotificationService: UNNotificationServiceExtension {
             interaction.donate { _ in }
 
             if let updated = try? request.content.updating(from: intent) {
-                contentHandler(updated)
+                // updating(from:) can drop custom payload keys — re-inject them
+                // so the tap handler still sees chat_jid and can route to the chat
+                if let mutable = updated.mutableCopy() as? UNMutableNotificationContent {
+                    mutable.userInfo = request.content.userInfo
+                    contentHandler(mutable)
+                } else {
+                    contentHandler(updated)
+                }
                 return
             }
 

@@ -70,6 +70,10 @@ struct MainTabView: View {
             // chats can land after the tap (cold launch) — retry then
             if router.pendingChatJid != nil { openPendingChat() }
         }
+        .onAppear {
+            // tap set the route before this view existed (cold launch)
+            if router.pendingChatJid != nil { openPendingChat() }
+        }
         .task {
             // app-wide background work (used to live on the Messages tab)
             emailStore.auth = auth
