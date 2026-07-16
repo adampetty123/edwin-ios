@@ -1,6 +1,8 @@
 import SwiftUI
 import EventKit
 
+private let settingsAccent = Color(hex: 0x2F6BFF)
+
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthStore
     @EnvironmentObject var wa: WAStore
@@ -8,255 +10,368 @@ struct SettingsView: View {
     @EnvironmentObject var storeKit: Store
     @State private var showPaywall = false
     @State private var confirmSignOut = false
-    @State private var showEmailSheet = false
-    @State private var showCalendarPicker = false
+
+    // Settings is pushed onto the home stack; NavigationLinks here push further.
+    var body: some View {
+        List {
+            Section { profileCard }
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
+
+            Section("User settings") {
+                NavigationLink { AccountsSettings() } label: {
+                    settingRow(icon: "person.crop.circle.fill", tint: settingsAccent, title: "Accounts")
+                }
+                NavigationLink { IntegrationsSettings() } label: {
+                    settingRow(icon: "square.grid.2x2.fill", tint: Color(hex: 0xE8519B), title: "Integrations")
+                }
+            }
+
+            Section("App settings") {
+                NavigationLink { AppearanceSettings() } label: {
+                    settingRow(icon: "paintbrush.fill", tint: Color(hex: 0x34C759), title: "Appearance")
+                }
+                NavigationLink { CalendarsSettings() } label: {
+                    settingRow(icon: "calendar", tint: Color(hex: 0xF5B900), title: "Calendars")
+                }
+                NavigationLink { EventsSettings() } label: {
+                    settingRow(icon: "ticket.fill", tint: Color(hex: 0xA25CFF), title: "Events")
+                }
+                NavigationLink { TodosSettings() } label: {
+                    settingRow(icon: "checkmark.circle.fill", tint: Color(hex: 0x8E8E93), title: "Todos")
+                }
+                NavigationLink { NotificationsSettings() } label: {
+                    settingRow(icon: "bell.fill", tint: Color(hex: 0xFF9500), title: "Notifications")
+                }
+            }
+
+            Section {
+                Button { sendFeedback() } label: {
+                    settingRow(icon: "paperplane.fill", tint: settingsAccent, title: "Send feedback", chevron: false)
+                }
+                Button(role: .destructive) { confirmSignOut = true } label: {
+                    settingRow(icon: "rectangle.portrait.and.arrow.right", tint: Color(hex: 0xFF3B30), title: "Log out", chevron: false)
+                }
+            } footer: {
+                Text("Edwin v1.0.0")
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundStyle(Theme.textFaint)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 12)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Theme.bg)
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
+        .confirmationDialog("You can sign back in anytime.", isPresented: $confirmSignOut, titleVisibility: .visible) {
+            Button("Log out", role: .destructive) { Task { await auth.signOut() } }
+        }
+        .sheet(isPresented: $showPaywall) { PaywallView(onClose: { showPaywall = false }) }
+        .task { if cal.connected { await cal.sync() } }
+    }
+
+    // MARK: profile card
+
+    private var profileCard: some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(Theme.accent)
+                .frame(width: 52, height: 52)
+                .overlay(
+                    Text(String(auth.userName.prefix(1)).uppercased())
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                )
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text(auth.userName.isEmpty ? "You" : auth.userName)
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.text)
+                    Button { showPaywall = true } label: {
+                        Text(storeKit.isPro ? "Pro" : "Free")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(storeKit.isPro ? Theme.accent : Theme.textMuted)
+                            .padding(.horizontal, 9).padding(.vertical, 2)
+                            .overlay(Capsule().stroke(storeKit.isPro ? Theme.accent : Theme.border, lineWidth: 1))
+                    }
+                }
+                Text(auth.userEmail)
+                    .font(.system(size: 13, design: .rounded))
+                    .foregroundStyle(Theme.textMuted)
+                    .lineLimit(1)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+
+    // MARK: row helper
+
+    @ViewBuilder
+    private func settingRow(icon: String, tint: Color, title: String, chevron: Bool = true) -> some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(tint)
+                .frame(width: 30, height: 30)
+                .overlay(Image(systemName: icon).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white))
+            Text(title)
+                .font(.system(size: 16, design: .rounded))
+                .foregroundStyle(Theme.text)
+            Spacer()
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func sendFeedback() {
+        let subject = "Edwin feedback".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        if let url = URL(string: "mailto:hello@flowjam.com?subject=\(subject)") {
+            UIApplication.shared.open(url)
+        }
+    }
+}
+
+// MARK: - Accounts (connections)
+
+struct AccountsSettings: View {
+    @EnvironmentObject var auth: AuthStore
+    @EnvironmentObject var wa: WAStore
     @State private var googleEmail: String?
     @State private var googleBusy = false
     @State private var googleError: String?
 
-    // NOTE: no NavigationStack here — Settings is pushed onto the Inbox stack
-    // from the gear button in the top-right corner.
     var body: some View {
-            List {
-                Section {
-                    HStack(spacing: 12) {
-                        Circle()
-                            .fill(Theme.accent)
-                            .frame(width: 52, height: 52)
-                            .overlay(
-                                Text(String(auth.userName.prefix(1)).uppercased())
-                                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
-                            )
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(auth.userName.isEmpty ? "You" : auth.userName)
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
-                                .foregroundStyle(Theme.text)
-                            Text(auth.userEmail)
-                                .font(.system(size: 13, design: .rounded))
-                                .foregroundStyle(Theme.textMuted)
-                        }
-                    }
-                    .padding(.vertical, 4)
+        List {
+            Section {
+                connectionRow(icon: "message.fill", tint: Theme.whatsapp, name: "WhatsApp",
+                              subtitle: wa.isConnected ? "Connected" : "Not connected",
+                              connected: wa.isConnected, busy: false,
+                              actionTitle: wa.isConnected ? "Connected" : "Set up",
+                              disabled: wa.isConnected) {}
+                connectionRow(icon: "envelope.fill", tint: Color(hex: 0xEA4335), name: "Google",
+                              subtitle: googleEmail.map { $0.isEmpty ? "Connected" : $0 } ?? "Gmail + Calendar",
+                              connected: googleEmail != nil, busy: googleBusy,
+                              actionTitle: googleEmail != nil ? "Connected" : "Connect",
+                              disabled: googleEmail != nil) {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    connectGoogle()
                 }
-
-                Section("Messaging") {
-                    connectionRow(
-                        icon: "message.fill", tint: Theme.whatsapp, name: "WhatsApp",
-                        subtitle: wa.isConnected ? "Connected" : "Not connected",
-                        connected: wa.isConnected,
-                        busy: false,
-                        actionTitle: wa.isConnected ? "Connected" : "Set up",
-                        disabled: wa.isConnected
-                    ) {}
-                }
-
-                Section {
-                    connectionRow(
-                        icon: "calendar", tint: Theme.accent, name: "Calendar",
-                        subtitle: cal.connected
-                            ? (cal.syncing ? "Syncing…" : "\(cal.eventCount) events · \(cal.selectionLabel)")
-                            : "Let Edwin see when you're free",
-                        connected: cal.connected,
-                        busy: cal.syncing,
-                        actionTitle: cal.connected ? "Disconnect" : "Connect"
-                    ) {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        Task { cal.connected ? await cal.disconnect() : await cal.connect() }
-                    }
-
-                    if cal.connected {
-                        Button {
-                            cal.loadCalendars()
-                            showCalendarPicker = true
-                        } label: {
-                            HStack {
-                                Label("Choose calendars", systemImage: "checklist")
-                                    .font(.system(size: 15, design: .rounded))
-                                    .foregroundStyle(Theme.text)
-                                Spacer()
-                                Text(cal.selectionLabel)
-                                    .font(.system(size: 13, design: .rounded))
-                                    .foregroundStyle(Theme.textMuted)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Theme.textFaint)
-                            }
-                        }
-                    }
-
-                    connectionRow(
-                        icon: "envelope.fill", tint: Color(hex: 0xEA4335), name: "Google",
-                        subtitle: googleEmail.map { $0.isEmpty ? "Connected" : $0 }
-                            ?? "Gmail + Calendar — Edwin reads mail, adds events",
-                        connected: googleEmail != nil,
-                        busy: googleBusy,
-                        actionTitle: googleEmail != nil ? "Connected" : "Connect",
-                        disabled: googleEmail != nil
-                    ) {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        connectGoogle()
-                    }
-                } header: {
-                    Text("Connections")
-                } footer: {
-                    if let err = googleError ?? cal.lastError {
-                        Text(err).foregroundStyle(Theme.danger)
-                    } else {
-                        Text("Edwin uses these to answer availability and surface what needs you. Nothing is shared without your say-so.")
-                    }
-                }
-
-                Section {
-                    Button { showPaywall = true } label: {
-                        HStack(spacing: 12) {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Theme.accent.opacity(0.12))
-                                .frame(width: 40, height: 40)
-                                .overlay(Image(systemName: "sparkles").font(.system(size: 17)).foregroundStyle(Theme.accent))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Edwin Pro")
-                                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(Theme.text)
-                                Text(storeKit.isPro ? "Active" : "7 days free, then from \(storeKit.quarterlyPerMonth ?? "£4.98")/mo")
-                                    .font(.system(size: 13, design: .rounded))
-                                    .foregroundStyle(storeKit.isPro ? Theme.success : Theme.textMuted)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Theme.textFaint)
-                        }
-                    }
-                }
-
-                Section("Preferences") {
-                    Label("Notifications", systemImage: "bell")
-                    Label("Privacy & data", systemImage: "checkmark.shield")
-                    HStack {
-                        Label("Assistant", systemImage: "wand.and.stars")
-                        Spacer()
-                        Text("Approve sends")
-                            .font(.system(size: 13, design: .rounded))
-                            .foregroundStyle(Theme.textMuted)
-                    }
-                }
-
-                Section {
-                    Button(role: .destructive) {
-                        confirmSignOut = true
-                    } label: {
-                        Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
-                    }
-                } footer: {
-                    Text("Edwin v1.0.0")
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 8)
+            } footer: {
+                if let err = googleError {
+                    Text(err).foregroundStyle(Theme.danger)
+                } else {
+                    Text("Edwin reads these to triage what matters and answer for you. Nothing sends without your ok.")
                 }
             }
-            .navigationTitle("Settings")
-            .confirmationDialog("You can sign back in anytime.", isPresented: $confirmSignOut, titleVisibility: .visible) {
-                Button("Sign out", role: .destructive) {
-                    Task { await auth.signOut() }
-                }
-            }
-            .sheet(isPresented: $showEmailSheet) { EmailConnectSheet() }
-            .sheet(isPresented: $showPaywall) { PaywallView(onClose: { showPaywall = false }) }
-            .sheet(isPresented: $showCalendarPicker) { CalendarPickerSheet() }
-        .background(Theme.bg)
-        .toolbar(.hidden, for: .tabBar)
-        .task {
-            // keep the calendar fresh whenever settings opens
-            if cal.connected { await cal.sync() }
-            await refreshGoogle()
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Theme.bg)
+        .navigationTitle("Accounts")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await refreshGoogle() }
     }
 
     private func refreshGoogle() async {
         guard let token = auth.accessToken else { return }
         googleEmail = await GoogleAuth.status(userId: auth.userId, accessToken: token)
     }
-
     private func connectGoogle() {
         guard let token = auth.accessToken, !googleBusy else { return }
-        googleBusy = true
-        googleError = nil
+        googleBusy = true; googleError = nil
         Task {
-            do {
-                try await GoogleAuth.connect(accessToken: token)
-                await refreshGoogle()
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-            } catch {
-                let msg = error.localizedDescription
-                if msg != "Cancelled." { googleError = msg }
-            }
+            do { try await GoogleAuth.connect(accessToken: token); await refreshGoogle()
+                 UINotificationFeedbackGenerator().notificationOccurred(.success) }
+            catch { let m = error.localizedDescription; if m != "Cancelled." { googleError = m } }
             googleBusy = false
         }
     }
+}
 
-    private func connectionRow(icon: String, tint: Color, name: String, subtitle: String, connected: Bool, busy: Bool, actionTitle: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
-        HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(tint.opacity(0.12))
-                .frame(width: 40, height: 40)
-                .overlay(Image(systemName: icon).font(.system(size: 17, design: .rounded)).foregroundStyle(tint))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Theme.text)
-                Text(subtitle)
-                    .font(.system(size: 13, design: .rounded))
-                    .foregroundStyle(connected ? Theme.success : Theme.textMuted)
-            }
-            Spacer()
-            if busy {
-                ProgressView()
-            } else {
-                Button(actionTitle, action: action)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(connected || disabled ? Theme.textMuted : .white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(connected || disabled ? Theme.surfaceAlt : Theme.accent))
-                    .disabled(disabled)
-            }
+/// Shared connection row (icon tile, name, subtitle, pill action).
+func connectionRow(icon: String, tint: Color, name: String, subtitle: String, connected: Bool, busy: Bool, actionTitle: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
+    HStack(spacing: 12) {
+        RoundedRectangle(cornerRadius: 10)
+            .fill(tint.opacity(0.12))
+            .frame(width: 40, height: 40)
+            .overlay(Image(systemName: icon).font(.system(size: 17, design: .rounded)).foregroundStyle(tint))
+        VStack(alignment: .leading, spacing: 2) {
+            Text(name).font(.system(size: 16, weight: .semibold, design: .rounded)).foregroundStyle(Theme.text)
+            Text(subtitle).font(.system(size: 13, design: .rounded)).foregroundStyle(connected ? Theme.success : Theme.textMuted)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(name), \(subtitle)")
-    }
-
-    private func channelRow(icon: String, tint: Color, name: String, connected: Bool, action: @escaping () -> Void) -> some View {
-        HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(tint.opacity(0.12))
-                .frame(width: 40, height: 40)
-                .overlay(Image(systemName: icon).font(.system(size: 17, design: .rounded)).foregroundStyle(tint))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Theme.text)
-                Text(connected ? "Connected" : "Not connected")
-                    .font(.system(size: 13, design: .rounded))
-                    .foregroundStyle(connected ? Theme.success : Theme.textMuted)
-                    .contentTransition(.numericText())
-            }
-            Spacer()
-            Button(connected ? "Disconnect" : "Connect", action: action)
+        Spacer()
+        if busy { ProgressView() }
+        else {
+            Button(actionTitle, action: action)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .buttonStyle(.borderless)
-                .foregroundStyle(connected ? Theme.textMuted : .white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(Capsule().fill(connected ? Theme.surfaceAlt : Theme.accent))
+                .foregroundStyle(connected || disabled ? Theme.textMuted : .white)
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(Capsule().fill(connected || disabled ? Theme.surfaceAlt : Theme.accent))
+                .disabled(disabled)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(name), \(connected ? "connected" : "not connected")")
     }
+}
 
-    private func toggle(_ channel: Channel, current: Bool) {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        withAnimation { auth.setChannel(channel, connected: !current) }
+// MARK: - Integrations (Edwin Pro + behaviour)
+
+struct IntegrationsSettings: View {
+    @EnvironmentObject var storeKit: Store
+    @State private var showPaywall = false
+
+    var body: some View {
+        List {
+            Section {
+                Button { showPaywall = true } label: {
+                    HStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: 10).fill(Theme.accent.opacity(0.12)).frame(width: 40, height: 40)
+                            .overlay(Image(systemName: "sparkles").font(.system(size: 17)).foregroundStyle(Theme.accent))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Edwin Pro").font(.system(size: 16, weight: .semibold, design: .rounded)).foregroundStyle(Theme.text)
+                            Text(storeKit.isPro ? "Active" : "7 days free, then from \(storeKit.quarterlyPerMonth ?? "£4.98")/mo")
+                                .font(.system(size: 13, design: .rounded))
+                                .foregroundStyle(storeKit.isPro ? Theme.success : Theme.textMuted)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.textFaint)
+                    }
+                }
+            } header: { Text("Subscription") }
+
+            Section("Assistant") {
+                HStack {
+                    Label("Sending", systemImage: "paperplane")
+                        .font(.system(size: 15, design: .rounded)).foregroundStyle(Theme.text)
+                    Spacer()
+                    Text("Approve first").font(.system(size: 13, design: .rounded)).foregroundStyle(Theme.textMuted)
+                }
+            } footer: {
+                Text("Edwin drafts replies and waits for your ok before anything is sent.")
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Theme.bg)
+        .navigationTitle("Integrations")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showPaywall) { PaywallView(onClose: { showPaywall = false }) }
+    }
+}
+
+// MARK: - Calendars
+
+struct CalendarsSettings: View {
+    @EnvironmentObject var cal: CalendarStore
+    @State private var showPicker = false
+
+    var body: some View {
+        List {
+            Section {
+                connectionRow(icon: "calendar", tint: Color(hex: 0xF5B900), name: "Calendar",
+                              subtitle: cal.connected ? (cal.syncing ? "Syncing…" : "\(cal.eventCount) events · \(cal.selectionLabel)") : "Let Edwin see when you're free",
+                              connected: cal.connected, busy: cal.syncing,
+                              actionTitle: cal.connected ? "Disconnect" : "Connect") {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    Task { cal.connected ? await cal.disconnect() : await cal.connect() }
+                }
+                if cal.connected {
+                    Button { cal.loadCalendars(); showPicker = true } label: {
+                        HStack {
+                            Label("Choose calendars", systemImage: "checklist")
+                                .font(.system(size: 15, design: .rounded)).foregroundStyle(Theme.text)
+                            Spacer()
+                            Text(cal.selectionLabel).font(.system(size: 13, design: .rounded)).foregroundStyle(Theme.textMuted)
+                            Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.textFaint)
+                        }
+                    }
+                }
+            } footer: {
+                if let err = cal.lastError { Text(err).foregroundStyle(Theme.danger) }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Theme.bg)
+        .navigationTitle("Calendars")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showPicker) { CalendarPickerSheet() }
+        .task { if cal.connected { await cal.sync() } }
+    }
+}
+
+// MARK: - lightweight app-settings screens
+
+struct AppearanceSettings: View {
+    @AppStorage("appearance.mode") private var mode = "system"
+    var body: some View {
+        List {
+            Section("Theme") {
+                ForEach([("system", "Match device"), ("light", "Light"), ("dark", "Dark")], id: \.0) { key, label in
+                    Button { mode = key } label: {
+                        HStack {
+                            Text(label).font(.system(size: 16, design: .rounded)).foregroundStyle(Theme.text)
+                            Spacer()
+                            if mode == key { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
+                        }
+                    }
+                }
+            } footer: { Text("Dark mode is coming in a later update; Edwin follows your device for now.") }
+        }
+        .listStyle(.insetGrouped).scrollContentBackground(.hidden).background(Theme.bg)
+        .navigationTitle("Appearance").navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct EventsSettings: View {
+    @EnvironmentObject var cal: CalendarStore
+    var body: some View {
+        List {
+            Section {
+                Toggle("Add plans to my calendar", isOn: .constant(true)).disabled(true)
+                    .font(.system(size: 16, design: .rounded))
+            } footer: {
+                Text("When you confirm a plan, Edwin puts it on your calendar automatically and tells you.")
+            }
+        }
+        .listStyle(.insetGrouped).scrollContentBackground(.hidden).background(Theme.bg)
+        .navigationTitle("Events").navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct TodosSettings: View {
+    var body: some View {
+        List {
+            Section {
+                Text("Edwin keeps a private to-do list of what you owe people and what you've asked him to track. Ask him \u{201c}what's on my list?\u{201d} in the chat any time.")
+                    .font(.system(size: 15, design: .rounded)).foregroundStyle(Theme.textMuted)
+            }
+        }
+        .listStyle(.insetGrouped).scrollContentBackground(.hidden).background(Theme.bg)
+        .navigationTitle("Todos").navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct NotificationsSettings: View {
+    var body: some View {
+        List {
+            Section {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                } label: {
+                    HStack {
+                        Text("Open notification settings").font(.system(size: 16, design: .rounded)).foregroundStyle(Theme.text)
+                        Spacer()
+                        Image(systemName: "arrow.up.forward.app").foregroundStyle(Theme.textFaint)
+                    }
+                }
+            } footer: {
+                Text("Edwin pings you when something needs you — an important message, a reply waiting for your ok. Manage the details in iOS Settings.")
+            }
+        }
+        .listStyle(.insetGrouped).scrollContentBackground(.hidden).background(Theme.bg)
+        .navigationTitle("Notifications").navigationBarTitleDisplayMode(.inline)
     }
 }
 
