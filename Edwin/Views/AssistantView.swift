@@ -228,7 +228,7 @@ struct AssistantChatView: View {
                         }
                     }
                     .frame(width: 44, height: 44)
-                    .background(Circle().fill(memo.recording ? Theme.danger : Theme.accent))
+                    .background(Circle().fill(memo.recording ? Theme.danger : Theme.bubbleMe))
                 }
                 .disabled(memo.transcribing)
                 .accessibilityLabel(memo.recording ? "Stop and send voice memo" : "Record voice memo")
