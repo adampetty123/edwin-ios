@@ -9,7 +9,6 @@ struct SettingsView: View {
     @EnvironmentObject var cal: CalendarStore
     @EnvironmentObject var storeKit: Store
     @State private var showPaywall = false
-    @State private var confirmSignOut = false
 
     // Settings is pushed onto the home stack; NavigationLinks here push further.
     var body: some View {
@@ -49,7 +48,7 @@ struct SettingsView: View {
                 Button { sendFeedback() } label: {
                     settingRow(icon: "paperplane.fill", tint: settingsAccent, title: "Send feedback", chevron: false)
                 }
-                Button(role: .destructive) { confirmSignOut = true } label: {
+                Button(role: .destructive) { Task { await auth.signOut() } } label: {
                     settingRow(icon: "rectangle.portrait.and.arrow.right", tint: Color(hex: 0xFF3B30), title: "Log out", chevron: false)
                 }
             } footer: {
@@ -66,9 +65,6 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .confirmationDialog("You can sign back in anytime.", isPresented: $confirmSignOut, titleVisibility: .visible) {
-            Button("Log out", role: .destructive) { Task { await auth.signOut() } }
-        }
         .sheet(isPresented: $showPaywall) { PaywallView(onClose: { showPaywall = false }) }
         .task { if cal.connected { await cal.sync() } }
     }
