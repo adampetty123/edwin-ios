@@ -14,6 +14,7 @@ struct MainTabView: View {
     private enum HomeRoute: Hashable { case chats, settings }
     @State private var path = NavigationPath()
     @StateObject private var emailStore = EmailStore()
+    @ObservedObject private var router = NotificationRouter.shared
 
     private var unreadTotal: Int {
         wa.chats.filter { !$0.assistant }.reduce(0) { $0 + ($1.unread ?? 0) }
@@ -64,6 +65,11 @@ struct MainTabView: View {
             }
         }
         .environmentObject(emailStore)
+        .onChange(of: router.pendingChatJid) { openPendingChat() }
+        .onChange(of: wa.chats.count) {
+            // chats can land after the tap (cold launch) — retry then
+            if router.pendingChatJid != nil { openPendingChat() }
+        }
         .task {
             // app-wide background work (used to live on the Messages tab)
             emailStore.auth = auth
@@ -80,6 +86,20 @@ struct MainTabView: View {
                 try? await Task.sleep(nanoseconds: wa.realtime.connected ? 20_000_000_000 : 5_000_000_000)
             }
         }
+    }
+
+    /// Notification tap → jump straight into that chat (Edwin chat = home root).
+    private func openPendingChat() {
+        guard let jid = router.pendingChatJid else { return }
+        if jid == WAClient.assistantJid {
+            router.pendingChatJid = nil
+            path = NavigationPath()   // Edwin chat IS home
+            return
+        }
+        guard let chat = wa.chats.first(where: { $0.jid == jid }) else { return } // retry on next chats refresh
+        router.pendingChatJid = nil
+        path = NavigationPath()
+        path.append(chat)
     }
 }
 

@@ -51,8 +51,22 @@ final class PushManager: NSObject, ObservableObject {
     }
 }
 
-/// Minimal app delegate to receive the APNs registration callbacks.
-final class PushAppDelegate: NSObject, UIApplicationDelegate {
+/// Routes notification taps to the right chat. The push payload carries
+/// chat_jid; the home view observes pendingChatJid and pushes that chat.
+@MainActor
+final class NotificationRouter: ObservableObject {
+    static let shared = NotificationRouter()
+    @Published var pendingChatJid: String?
+}
+
+/// App delegate: APNs registration callbacks + notification tap handling.
+final class PushAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
     func application(_ application: UIApplication,
                      didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Task { @MainActor in PushManager.shared.didRegister(deviceToken: deviceToken) }
@@ -60,5 +74,23 @@ final class PushAppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFailToRegisterForRemoteNotificationsWithError error: Error) {
         // no-op: simulator / entitlement issues land here
+    }
+
+    /// Tap on a notification → open the chat it came from.
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        let info = response.notification.request.content.userInfo
+        if let jid = info["chat_jid"] as? String, !jid.isEmpty {
+            Task { @MainActor in NotificationRouter.shared.pendingChatJid = jid }
+        }
+        completionHandler()
+    }
+
+    /// Show banners even when the app is foregrounded.
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
     }
 }
