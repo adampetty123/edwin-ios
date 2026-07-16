@@ -15,6 +15,7 @@ targets:
       path: Edwin/Edwin.entitlements
       properties:
         com.apple.developer.applesignin: [Default]
+        aps-environment: production
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.flowjam.iris

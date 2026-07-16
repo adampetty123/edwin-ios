@@ -87,6 +87,9 @@ jobs:
           codesign -d --entitlements :- ipa-check/Payload/*.app 2>/dev/null | grep -q applesignin \
             && echo "OK: applesignin entitlement present" \
             || { echo "FAIL: applesignin entitlement MISSING"; exit 1; }
+          codesign -d --entitlements :- ipa-check/Payload/*.app 2>/dev/null | grep -q aps-environment \
+            && echo "OK: aps-environment entitlement present" \
+            || { echo "FAIL: aps-environment entitlement MISSING"; exit 1; }
           rm -rf ipa-check
 
       - name: Upload to TestFlight
