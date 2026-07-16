@@ -48,15 +48,18 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASS" $KEYCHAIN
           rm dist.p12
 
-      - name: Install provisioning profile
+      - name: Install provisioning profiles
         env:
           PROFILE_B64: ${{ secrets.PROVISIONING_PROFILE_B64 }}
+          PROFILE_NSE_B64: ${{ secrets.PROFILE_NSE_B64 }}
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$PROFILE_B64" | base64 --decode > profile.mobileprovision
-          UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin <<< "$(security cms -D -i profile.mobileprovision)")
-          cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
-          echo "installed profile $UUID"
+          for var in PROFILE_B64 PROFILE_NSE_B64; do
+            echo "${!var}" | base64 --decode > profile.mobileprovision
+            UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin <<< "$(security cms -D -i profile.mobileprovision)")
+            cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+            echo "installed $var as $UUID"
+          done
 
       - name: Archive
         run: |

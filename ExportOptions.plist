@@ -12,6 +12,8 @@
     <dict>
         <key>com.flowjam.iris</key>
         <string>Iris App Store</string>
+        <key>com.flowjam.iris.NotificationService</key>
+        <string>Iris NSE App Store</string>
     </dict>
     <key>uploadSymbols</key>
     <true/>
