@@ -7,6 +7,14 @@ struct InboxView: View {
 
     @EnvironmentObject var emailStore: EmailStore
 
+    /// Channel filter behind the toolbar funnel button.
+    enum ChannelFilter: String, CaseIterable {
+        case all = "All"
+        case whatsapp = "WhatsApp"
+        case email = "Email"
+    }
+    @State private var filter: ChannelFilter = .all
+
     @State private var search = ""
     @State private var messageHits: [WAMessage] = []
     @State private var searchTask: Task<Void, Never>?
@@ -34,12 +42,13 @@ struct InboxView: View {
     }
 
     private var unifiedItems: [InboxItem] {
-        let chats = realChats.map(InboxItem.chat)
-        let emails = emailStore.emails.map(InboxItem.email)
+        let chats = filter == .email ? [] : realChats.map(InboxItem.chat)
+        let emails = filter == .whatsapp ? [] : emailStore.emails.map(InboxItem.email)
         return (chats + emails).sorted { $0.when > $1.when }
     }
 
     private var emailMatches: [Email] {
+        guard filter != .whatsapp else { return [] }
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return [] }
         return emailStore.emails.filter {
@@ -51,6 +60,7 @@ struct InboxView: View {
 
     /// Chats whose name or last message matches the query.
     private var chatMatches: [WAChat] {
+        guard filter != .email else { return [] }
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return realChats }
         return realChats.filter {
@@ -72,6 +82,24 @@ struct InboxView: View {
             .navigationTitle("All Chats")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $search, prompt: "Search chats, messages and email")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Picker("Filter", selection: $filter) {
+                            Label("All", systemImage: "tray.full").tag(ChannelFilter.all)
+                            Label("WhatsApp", systemImage: "message").tag(ChannelFilter.whatsapp)
+                            Label("Email", systemImage: "envelope").tag(ChannelFilter.email)
+                        }
+                    } label: {
+                        Image(systemName: filter == .all
+                              ? "line.3.horizontal.decrease.circle"
+                              : "line.3.horizontal.decrease.circle.fill")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(filter == .all ? Theme.text : Theme.accent)
+                    }
+                    .accessibilityLabel("Filter: \(filter.rawValue)")
+                }
+            }
             .onChange(of: search) {
                 let q = search
                 searchTask?.cancel()
