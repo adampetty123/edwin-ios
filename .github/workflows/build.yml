@@ -24,8 +24,9 @@ jobs:
 
       - name: Bump build number
         run: |
-          # unique, monotonically increasing build number from commit count + run number
-          BUILD_NUM=$((100 + ${{ github.run_number }}))
+          # epoch seconds — strictly increasing, can never collide with other pipelines
+          # (EAS autoIncrement grabbed 150-172 on this app record and silently ate uploads)
+          BUILD_NUM=$(date +%s)
           sed -i '' "s/CURRENT_PROJECT_VERSION: \"1\"/CURRENT_PROJECT_VERSION: \"$BUILD_NUM\"/" project.yml
           echo "build number: $BUILD_NUM"
 
