@@ -16,6 +16,38 @@ final class WAStore: ObservableObject {
 
     weak var auth: AuthStore?
     private var assistantReady = false
+
+    // MARK: disk cache — chats + Edwin's thread render instantly on launch,
+    // the network refresh replaces them moments later.
+    private static var cacheURL: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("edwin_state.json")
+    }
+    private struct CachedState: Codable {
+        var chats: [WAChat]
+        var assistantMessages: [WAMessage]
+    }
+
+    init() {
+        if let data = try? Data(contentsOf: Self.cacheURL),
+           let cached = try? JSONDecoder().decode(CachedState.self, from: data) {
+            chats = cached.chats
+            messages[WAClient.assistantJid] = cached.assistantMessages
+        }
+    }
+
+    private func persistCache() {
+        let state = CachedState(
+            chats: Array(chats.prefix(100)),
+            assistantMessages: Array((messages[WAClient.assistantJid] ?? []).suffix(50))
+        )
+        let url = Self.cacheURL
+        Task.detached(priority: .background) {
+            if let data = try? JSONEncoder().encode(state) {
+                try? data.write(to: url, options: .atomic)
+            }
+        }
+    }
     /// Live socket — when connected, polling drops to a slow safety net.
     let realtime = RealtimeClient()
 
@@ -56,6 +88,7 @@ final class WAStore: ObservableObject {
         guard let token else { return }
         if let c = try? await WAClient.chats(token: token), c != chats {
             chats = c
+            persistCache()
         }
     }
 
@@ -73,6 +106,7 @@ final class WAStore: ObservableObject {
         guard let token else { return }
         if let m = try? await WAClient.messages(chatJid: chatJid, token: token), m != messages[chatJid] {
             messages[chatJid] = m
+            if chatJid == WAClient.assistantJid { persistCache() }
         }
     }
 

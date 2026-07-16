@@ -38,12 +38,26 @@ final class AuthStore: ObservableObject {
         onboardingDone = d.bool(forKey: Keys.onboarded)
 
         guard let refresh = Keychain.get(Keys.refresh) else { return }
+        // fast path: cached identity + last access token render the app
+        // instantly; the token refresh happens behind the UI instead of
+        // blocking cold launch on a network round-trip.
+        if let uid = d.string(forKey: "edwin.cache.userId"), !uid.isEmpty,
+           let cachedAccess = Keychain.get("edwin.cache.access") {
+            userId = uid
+            userName = d.string(forKey: "edwin.cache.name") ?? ""
+            userEmail = d.string(forKey: "edwin.cache.email") ?? ""
+            accessToken = cachedAccess
+            isAuthed = true
+            isLoading = false
+        }
         do {
             let session = try await SupabaseAuthClient.refresh(refreshToken: refresh)
             apply(session)
         } catch {
-            // stale token — stay signed out quietly
-            Keychain.delete(Keys.refresh)
+            // refresh failed: if we never got a cached session, the token is
+            // stale — sign out quietly. if we're optimistically authed it was
+            // likely a network blip; the next refresh cycle sorts it.
+            if !isAuthed { Keychain.delete(Keys.refresh) }
         }
     }
 
@@ -87,12 +101,21 @@ final class AuthStore: ObservableObject {
         userName = ""
         userEmail = ""
         Keychain.delete(Keys.refresh)
+        Keychain.delete("edwin.cache.access")
+        UserDefaults.standard.removeObject(forKey: "edwin.cache.userId")
+        try? FileManager.default.removeItem(
+            at: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("edwin_state.json"))
         resetOnboarding()
     }
 
     private func apply(_ session: AuthSession) {
         accessToken = session.accessToken
         userId = session.user.id
+        UserDefaults.standard.set(session.user.id, forKey: "edwin.cache.userId")
+        UserDefaults.standard.set(session.user.displayName, forKey: "edwin.cache.name")
+        UserDefaults.standard.set(session.user.email ?? "", forKey: "edwin.cache.email")
+        Keychain.set(session.accessToken, for: "edwin.cache.access")
         userName = session.user.displayName
         userEmail = session.user.email ?? ""
         isAuthed = true
