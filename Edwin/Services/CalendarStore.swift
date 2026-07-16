@@ -124,7 +124,8 @@ final class CalendarStore: ObservableObject {
             do {
                 try store.save(ev, span: .thisEvent)
                 addedAny = true
-                try? await CalendarSync.markPending(id: row.id, status: "added", token: token)
+                try? await CalendarSync.markPending(id: row.id, status: "added",
+                                                    calendarTitle: ev.calendar?.title, token: token)
             } catch {
                 try? await CalendarSync.markPending(id: row.id, status: "failed", token: token)
             }
@@ -172,6 +173,7 @@ final class CalendarStore: ObservableObject {
                 "starts_at": iso.string(from: e.startDate),
                 "ends_at": e.endDate.map { iso.string(from: $0) } ?? NSNull(),
                 "location": (e.location?.isEmpty == false ? e.location! : NSNull()) as Any,
+                "calendar_title": (e.calendar?.title.isEmpty == false ? e.calendar!.title : NSNull()) as Any,
                 "all_day": e.isAllDay,
             ])
         }
@@ -221,9 +223,11 @@ enum CalendarSync {
         return (try? JSONDecoder().decode([PendingEvent].self, from: data)) ?? []
     }
 
-    static func markPending(id: Int, status: String, token: String) async throws {
+    static func markPending(id: Int, status: String, calendarTitle: String? = nil, token: String) async throws {
+        var body: [String: Any] = ["status": status]
+        if let calendarTitle { body["calendar_title"] = calendarTitle }
         try await req("PATCH", "/assistant_calendar_pending?id=eq.\(id)", token: token,
-                      body: ["status": status], prefer: "return=minimal")
+                      body: body, prefer: "return=minimal")
     }
 
     /// Replace the user's synced window: clear then upsert (tolerates dupes).
