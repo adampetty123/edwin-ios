@@ -306,6 +306,8 @@ struct ChatView: View {
             .scrollDismissesKeyboard(.interactively)
             .onChange(of: msgs.count) {
                 if let last = msgs.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
+                // messages that arrive while the chat is open are read too
+                Task { await wa.markRead(chatJid: chat.jid) }
             }
         }
         .background(Theme.bg)
@@ -324,6 +326,10 @@ struct ChatView: View {
             }
         }
         .toolbar(.hidden, for: .tabBar)
+        .onDisappear {
+            // leaving the chat clears the pill instantly, no waiting on the poll
+            Task { await wa.markRead(chatJid: chat.jid) }
+        }
         .safeAreaInset(edge: .bottom) { composer }
         .task {
             await wa.markRead(chatJid: chat.jid)

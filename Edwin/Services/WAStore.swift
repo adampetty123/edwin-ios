@@ -91,11 +91,22 @@ final class WAStore: ObservableObject {
         try? await WAClient.hideChat(userId: userId, jid: chat.jid, token: token)
     }
 
+    /// Chats the user just opened: server unread lags a beat behind, so pin
+    /// these to 0 locally for a grace window or the pill flickers back.
+    private var recentlyRead: [String: Date] = [:]
+
     func refreshChats() async {
         guard let token else { return }
-        if let c = try? await WAClient.chats(token: token), c != chats {
-            chats = c
-            persistCache()
+        if var c = try? await WAClient.chats(token: token) {
+            let now = Date()
+            recentlyRead = recentlyRead.filter { now.timeIntervalSince($0.value) < 90 }
+            for (jid, _) in recentlyRead {
+                if let i = c.firstIndex(where: { $0.jid == jid }) { c[i].unread = 0 }
+            }
+            if c != chats {
+                chats = c
+                persistCache()
+            }
         }
     }
 
@@ -131,6 +142,7 @@ final class WAStore: ObservableObject {
 
     /// Optimistically zero the badge, then sync read state to WhatsApp itself.
     func markRead(chatJid: String) async {
+        recentlyRead[chatJid] = Date()
         if let i = chats.firstIndex(where: { $0.jid == chatJid }), (chats[i].unread ?? 0) > 0 {
             chats[i].unread = 0
         }
