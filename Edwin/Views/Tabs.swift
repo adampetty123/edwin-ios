@@ -1,27 +1,93 @@
 import SwiftUI
 import EventKit
 
-// MARK: - Root tab bar (liquid glass on iOS 26, classic below)
+// MARK: - Root: Edwin IS the app. No tab bar — chats top-left, settings top-right.
 
 struct MainTabView: View {
+    @EnvironmentObject var auth: AuthStore
+    @EnvironmentObject var wa: WAStore
+    @EnvironmentObject var cal: CalendarStore
+
+    @State private var showChats = false
+    @State private var showSettings = false
+
+    private var unreadTotal: Int {
+        wa.chats.filter { !$0.assistant }.reduce(0) { $0 + ($1.unread ?? 0) }
+    }
+
     var body: some View {
-        // Base (outline) SF Symbols only — the system fills the selected tab
-        // itself; hardcoding .fill variants makes every tab look heavy.
-        if #available(iOS 26.0, *) {
-            TabView {
-                Tab("Edwin", systemImage: "sparkles") { EdwinTab() }
-                Tab("Messages", systemImage: "message") { InboxView() }
-                Tab("Email", systemImage: "envelope") { EmailTab() }
-                Tab("Calendar", systemImage: "calendar") { CalendarTab() }
-                Tab(role: .search) { SearchTab() }
+        NavigationStack {
+            Group {
+                if let edwin = wa.assistantChat {
+                    AssistantChatView(chat: edwin)
+                } else {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Theme.bg)
+                }
             }
-        } else {
-            TabView {
-                EdwinTab().tabItem { Label("Edwin", systemImage: "sparkles") }
-                InboxView().tabItem { Label("Messages", systemImage: "message") }
-                EmailTab().tabItem { Label("Email", systemImage: "envelope") }
-                CalendarTab().tabItem { Label("Calendar", systemImage: "calendar") }
-                SearchTab().tabItem { Label("Search", systemImage: "magnifyingglass") }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showChats = true } label: {
+                        Circle()
+                            .fill(Theme.surface)
+                            .frame(width: 32, height: 32)
+                            .overlay(
+                                Image(systemName: "bubble.left.and.bubble.right.fill")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Theme.textMuted)
+                            )
+                            .overlay(alignment: .topTrailing) {
+                                if unreadTotal > 0 {
+                                    Circle()
+                                        .fill(Theme.accent)
+                                        .frame(width: 9, height: 9)
+                                        .overlay(Circle().stroke(Theme.bg, lineWidth: 1.5))
+                                }
+                            }
+                    }
+                    .accessibilityLabel(unreadTotal > 0 ? "All chats, \(unreadTotal) unread" : "All chats")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showSettings = true } label: {
+                        Circle()
+                            .fill(Theme.surface)
+                            .frame(width: 32, height: 32)
+                            .overlay(
+                                Image(systemName: "gearshape.fill")
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(Theme.textMuted)
+                            )
+                            .overlay(alignment: .topTrailing) {
+                                Circle()
+                                    .fill(wa.isConnected ? Theme.success : Theme.textFaint)
+                                    .frame(width: 8, height: 8)
+                                    .overlay(Circle().stroke(Theme.bg, lineWidth: 1.5))
+                            }
+                    }
+                    .accessibilityLabel("Settings")
+                }
+            }
+            .navigationDestination(isPresented: $showChats) { InboxView() }
+            .navigationDestination(isPresented: $showSettings) { SettingsView() }
+            .navigationDestination(for: WAChat.self) { chat in
+                if chat.assistant { AssistantChatView(chat: chat) }
+                else { ChatView(chat: chat) }
+            }
+        }
+        .task {
+            // app-wide background work (used to live on the Messages tab)
+            await wa.ensureAssistant()
+            await wa.refreshChats()
+            PushManager.shared.enable()
+            while !Task.isCancelled {
+                wa.startRealtime()
+                await PushManager.shared.syncIfNeeded(userId: auth.userId, accessToken: auth.accessToken)
+                await wa.refreshAccount()
+                await wa.refreshChats()
+                await wa.refreshDrafts()
+                await cal.processPendingEvents()
+                try? await Task.sleep(nanoseconds: wa.realtime.connected ? 20_000_000_000 : 5_000_000_000)
             }
         }
     }

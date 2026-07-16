@@ -5,6 +5,8 @@ struct InboxView: View {
     @EnvironmentObject var wa: WAStore
     @EnvironmentObject var cal: CalendarStore
 
+    @StateObject private var emailStore = EmailStore()
+
     @State private var search = ""
     @State private var messageHits: [WAMessage] = []
     @State private var searchTask: Task<Void, Never>?
@@ -12,6 +14,40 @@ struct InboxView: View {
 
     private var realChats: [WAChat] { wa.chats.filter { !$0.assistant } }
     private var searching: Bool { !search.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    /// WhatsApp chats and emails, one stream, newest activity first.
+    private enum InboxItem: Identifiable {
+        case chat(WAChat)
+        case email(Email)
+        var id: String {
+            switch self {
+            case .chat(let c): return "c:\(c.jid)"
+            case .email(let e): return "e:\(e.gmailId)"
+            }
+        }
+        var when: Date {
+            switch self {
+            case .chat(let c): return c.lastMessageAt ?? .distantPast
+            case .email(let e): return e.ts ?? .distantPast
+            }
+        }
+    }
+
+    private var unifiedItems: [InboxItem] {
+        let chats = realChats.map(InboxItem.chat)
+        let emails = emailStore.emails.map(InboxItem.email)
+        return (chats + emails).sorted { $0.when > $1.when }
+    }
+
+    private var emailMatches: [Email] {
+        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return [] }
+        return emailStore.emails.filter {
+            $0.sender.lowercased().contains(q)
+            || ($0.subject?.lowercased().contains(q) ?? false)
+            || ($0.snippet?.lowercased().contains(q) ?? false)
+        }
+    }
 
     /// Chats whose name or last message matches the query.
     private var chatMatches: [WAChat] {
@@ -30,53 +66,36 @@ struct InboxView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            list
+        // Pushed from the Edwin home screen — lives in the parent NavigationStack.
+        list
             .background(Theme.bg)
             .navigationTitle("All Chats")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                // Edwin quick-access circle on the left, settings circle on the
-                // right, small centered title in line with both.
-                ToolbarItem(placement: .topBarLeading) {
-                    if let edwin = wa.assistantChat {
-                        NavigationLink(value: edwin) {
-                            Image("EdwinAvatar")
-                                .resizable().scaledToFill()
-                                .frame(width: 32, height: 32)
-                                .clipShape(Circle())
-                        }
-                        .accessibilityLabel("Edwin")
-                    }
+            .searchable(text: $search, prompt: "Search chats, messages and email")
+            .navigationDestination(for: Email.self) { email in
+                EmailDetailView(email: email)
+                    .environmentObject(emailStore)
+            }
+            .onChange(of: search) {
+                let q = search
+                searchTask?.cancel()
+                guard q.trimmingCharacters(in: .whitespaces).count >= 2 else { messageHits = []; return }
+                searchTask = Task {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    guard !Task.isCancelled else { return }
+                    let hits = await wa.searchMessages(q)
+                    if !Task.isCancelled { messageHits = hits }
                 }
-                ToolbarItem(placement: .principal) {
-                    Text("All Chats")
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Theme.text)
+            }
+            .task {
+                emailStore.auth = auth
+                await emailStore.refresh()
+                while !Task.isCancelled {
+                    await wa.refreshChats()
+                    await emailStore.refresh()
+                    try? await Task.sleep(nanoseconds: 30_000_000_000)
                 }
-                ToolbarItem(placement: .topBarTrailing) { settingsButton }
             }
-            .navigationDestination(for: WAChat.self) { chat in
-                if chat.assistant { AssistantChatView(chat: chat) }
-                else { ChatView(chat: chat) }
-            }
-            .navigationDestination(isPresented: $showSettings) { SettingsView() }
-        }
-        .task {
-            await wa.ensureAssistant()
-            PushManager.shared.enable()
-            while !Task.isCancelled {
-                wa.startRealtime()
-                await PushManager.shared.syncIfNeeded(userId: auth.userId, accessToken: auth.accessToken)
-                await wa.refreshAccount()
-                await wa.refreshChats()
-                await wa.refreshDrafts()
-                // events Edwin added land in the real calendar within one cycle
-                await cal.processPendingEvents()
-                // realtime socket carries the instant updates; polling becomes a safety net
-                try? await Task.sleep(nanoseconds: wa.realtime.connected ? 20_000_000_000 : 5_000_000_000)
-            }
-        }
     }
 
     private func chat(for jid: String) -> WAChat? { wa.chats.first { $0.jid == jid } }
@@ -109,31 +128,28 @@ struct InboxView: View {
             searchResults
         } else {
             List {
-                // Edwin is always pinned at the very top
-                if let edwin = wa.assistantChat {
-                    NavigationLink(value: edwin) {
-                        AssistantRow(chat: edwin, draftCount: wa.drafts.count)
-                    }
-                    .listRowInsets(EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20))
-                    .listRowSeparatorTint(Theme.border)
-                    .listRowBackground(Theme.accentSoft.opacity(0.35))
-                }
-
-                if realChats.isEmpty {
+                if unifiedItems.isEmpty {
                     Group {
                         if wa.isConnected { syncingRow } else { notConnectedRow }
                     }
                     .listRowSeparator(.hidden)
                 } else {
-                    ForEach(realChats) { chat in
-                        NavigationLink(value: chat) { ChatRow(chat: chat) }
-                            .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
-                            .listRowSeparatorTint(Theme.border)
+                    ForEach(unifiedItems) { item in
+                        switch item {
+                        case .chat(let chat):
+                            NavigationLink(value: chat) { ChatRow(chat: chat) }
+                                .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
+                                .listRowSeparatorTint(Theme.border)
+                        case .email(let email):
+                            NavigationLink(value: email) { UnifiedEmailRow(email: email) }
+                                .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
+                                .listRowSeparatorTint(Theme.border)
+                        }
                     }
                 }
             }
             .listStyle(.plain)
-            .refreshable { await wa.refreshChats() }
+            .refreshable { await wa.refreshChats(); await emailStore.refresh() }
         }
     }
 
@@ -159,7 +175,15 @@ struct InboxView: View {
                     }
                 }
             }
-            if chatMatches.isEmpty && extraMessageHits.isEmpty {
+            if !emailMatches.isEmpty {
+                Section("Email") {
+                    ForEach(emailMatches) { email in
+                        NavigationLink(value: email) { UnifiedEmailRow(email: email) }
+                            .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20))
+                    }
+                }
+            }
+            if chatMatches.isEmpty && extraMessageHits.isEmpty && emailMatches.isEmpty {
                 Text(search.trimmingCharacters(in: .whitespaces).count < 2
                      ? "Keep typing to search…"
                      : "No matches for “\(search)”.")
@@ -429,5 +453,53 @@ struct AssistantRow: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Edwin, your assistant. \(draftCount) drafts awaiting approval.")
+    }
+}
+
+
+/// Email row in the unified All Chats list — mirrors ChatRow's shape with an
+/// envelope avatar so mail is scannable at a glance.
+struct UnifiedEmailRow: View {
+    let email: Email
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(Color(hex: 0xEA4335).opacity(0.12))
+                .frame(width: 46, height: 46)
+                .overlay(Image(systemName: "envelope.fill")
+                    .font(.system(size: 17))
+                    .foregroundStyle(Color(hex: 0xEA4335)))
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(email.sender)
+                        .font(.system(size: 16, weight: email.unread ? .bold : .semibold, design: .rounded))
+                        .foregroundStyle(Theme.text)
+                        .lineLimit(1)
+                    Spacer()
+                    if let ts = email.ts {
+                        Text(rowTime(ts))
+                            .font(.system(size: 13, design: .rounded))
+                            .foregroundStyle(email.unread ? Theme.accent : Theme.textFaint)
+                    }
+                }
+                HStack(alignment: .top) {
+                    Text(email.subject ?? "(no subject)")
+                        .font(.system(size: 14, weight: email.unread ? .semibold : .regular, design: .rounded))
+                        .foregroundStyle(email.unread ? Theme.text : Theme.textMuted)
+                        .lineLimit(1)
+                    Spacer()
+                    if email.unread {
+                        Circle().fill(Theme.accent).frame(width: 9, height: 9).padding(.top, 4)
+                    }
+                }
+            }
+        }
+    }
+
+    private func rowTime(_ d: Date) -> String {
+        if Calendar.current.isDateInToday(d) { return d.formatted(date: .omitted, time: .shortened) }
+        if Calendar.current.isDateInYesterday(d) { return "Yesterday" }
+        return d.formatted(.dateTime.day().month(.abbreviated))
     }
 }
