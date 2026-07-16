@@ -240,13 +240,15 @@ struct IntegrationsSettings: View {
                 }
             } header: { Text("Subscription") }
 
-            Section("Assistant") {
+            Section {
                 HStack {
                     Label("Sending", systemImage: "paperplane")
                         .font(.system(size: 15, design: .rounded)).foregroundStyle(Theme.text)
                     Spacer()
                     Text("Approve first").font(.system(size: 13, design: .rounded)).foregroundStyle(Theme.textMuted)
                 }
+            } header: {
+                Text("Assistant")
             } footer: {
                 Text("Edwin drafts replies and waits for your ok before anything is sent.")
             }
@@ -307,7 +309,7 @@ struct AppearanceSettings: View {
     @AppStorage("appearance.mode") private var mode = "system"
     var body: some View {
         List {
-            Section("Theme") {
+            Section {
                 ForEach([("system", "Match device"), ("light", "Light"), ("dark", "Dark")], id: \.0) { key, label in
                     Button { mode = key } label: {
                         HStack {
@@ -317,6 +319,8 @@ struct AppearanceSettings: View {
                         }
                     }
                 }
+            } header: {
+                Text("Theme")
             } footer: { Text("Dark mode is coming in a later update; Edwin follows your device for now.") }
         }
         .listStyle(.insetGrouped).scrollContentBackground(.hidden).background(Theme.bg)
