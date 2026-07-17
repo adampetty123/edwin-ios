@@ -87,10 +87,11 @@ final class PushAppDelegate: NSObject, UIApplicationDelegate, UNUserNotification
         completionHandler()
     }
 
-    /// Show banners even when the app is foregrounded.
+    /// App open = no notifications (owner ask). The inbox is already on screen
+    /// and realtime updates it live, so a banner on top is pure noise.
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner, .sound])
+        completionHandler([])
     }
 }
