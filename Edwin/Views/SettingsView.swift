@@ -137,6 +137,7 @@ struct AccountsSettings: View {
     @State private var googleEmail: String?
     @State private var googleBusy = false
     @State private var googleError: String?
+    @State private var showWASetup = false
 
     var body: some View {
         List {
@@ -145,7 +146,7 @@ struct AccountsSettings: View {
                               subtitle: wa.isConnected ? "Connected" : "Not connected",
                               connected: wa.isConnected, busy: false,
                               actionTitle: wa.isConnected ? "Connected" : "Set up",
-                              disabled: wa.isConnected) {}
+                              disabled: wa.isConnected) { showWASetup = true }
                 connectionRow(icon: "envelope.fill", tint: Color(hex: 0xEA4335), name: "Google",
                               subtitle: googleEmail.map { $0.isEmpty ? "Connected" : $0 } ?? "Gmail + Calendar",
                               connected: googleEmail != nil, busy: googleBusy,
@@ -167,6 +168,11 @@ struct AccountsSettings: View {
         .background(Theme.bg)
         .navigationTitle("Accounts")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showWASetup) {
+            ConnectWhatsAppView(stepIndex: 0,
+                                onDone: { showWASetup = false },
+                                onSkip: { showWASetup = false })
+        }
         .task { await refreshGoogle() }
     }
 
