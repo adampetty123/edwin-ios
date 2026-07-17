@@ -246,8 +246,19 @@ enum CalendarSync {
             ]
             let dows = (days ?? []).compactMap { dayMap[$0.lowercased()] }.map { EKRecurrenceDayOfWeek($0) }
             var end: EKRecurrenceEnd? = nil
-            if let until, let d = CalendarStore.parseISO(until) ?? CalendarStore.parseISODate(until) {
-                end = EKRecurrenceEnd(end: d)
+            if let until {
+                // parse locally — CalendarStore's helpers are main-actor-isolated
+                let iso = ISO8601DateFormatter()
+                iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                var d = iso.date(from: until)
+                if d == nil { iso.formatOptions = [.withInternetDateTime]; d = iso.date(from: until) }
+                if d == nil {
+                    let df = DateFormatter()
+                    df.dateFormat = "yyyy-MM-dd"
+                    df.timeZone = .current
+                    d = df.date(from: String(until.prefix(10)))
+                }
+                if let d { end = EKRecurrenceEnd(end: d) }
             } else if let count, count > 0 {
                 end = EKRecurrenceEnd(occurrenceCount: count)
             }
