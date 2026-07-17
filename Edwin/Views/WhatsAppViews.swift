@@ -542,6 +542,86 @@ extension View {
     }
 }
 
+/// Inline video bubble: real thumbnail (generated on-device from the remote
+/// file — the server stores no separate thumb) with a play button. Tapping
+/// plays right there in the chat, no fullscreen bounce; scrolling away stops
+/// it and puts the preview back.
+struct InlineVideoView: View {
+    let url: URL
+    var fromMe: Bool = false
+    @State private var thumb: UIImage?
+    @State private var videoSize: CGSize?
+    @State private var durationText: String?
+    @State private var playing = false
+    @State private var player = AVPlayer()
+
+    private var size: CGSize {
+        let w: CGFloat = 230
+        guard let s = videoSize, s.width > 0 else { return CGSize(width: w, height: 150) }
+        let h = w * s.height / s.width
+        return CGSize(width: w, height: min(max(h, 110), 300))
+    }
+
+    var body: some View {
+        ZStack {
+            if playing {
+                VideoPlayer(player: player)
+            } else {
+                if let thumb {
+                    Image(uiImage: thumb).resizable().scaledToFill()
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(fromMe ? Color.white.opacity(0.2) : Theme.surfaceAlt)
+                }
+                Button {
+                    player.replaceCurrentItem(with: AVPlayerItem(url: url))
+                    player.play()
+                    withAnimation(.snappy) { playing = true }
+                } label: {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(15)
+                        .background(Circle().fill(.black.opacity(0.55)))
+                }
+                if let durationText {
+                    Text(durationText)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(Capsule().fill(.black.opacity(0.55)))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                        .padding(6)
+                }
+            }
+        }
+        .frame(width: size.width, height: size.height)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .task { await loadMeta() }
+        .onDisappear { player.pause(); playing = false }
+    }
+
+    private func loadMeta() async {
+        let asset = AVURLAsset(url: url)
+        if let tracks = try? await asset.loadTracks(withMediaType: .video),
+           let track = tracks.first,
+           let s = try? await track.load(.naturalSize) {
+            videoSize = s
+        }
+        if let d = try? await asset.load(.duration), d.seconds.isFinite, d.seconds > 0 {
+            let total = Int(d.seconds.rounded())
+            durationText = String(format: "%d:%02d", total / 60, total % 60)
+        }
+        let gen = AVAssetImageGenerator(asset: asset)
+        gen.appliesPreferredTrackTransform = true
+        gen.maximumSize = CGSize(width: 460, height: 600)
+        if let (cg, _) = try? await gen.image(at: .zero) {
+            thumb = UIImage(cgImage: cg)
+        }
+    }
+}
+
 /// In-app playback for videos and voice notes — no more bouncing to Safari.
 struct MediaPlayerScreen: View {
     let url: URL
@@ -792,10 +872,7 @@ struct MessageBubble: View {
                     }
                 }
             case "video":
-                Button { playingMedia = PlayableMedia(url: url) } label: {
-                    mediaChip(icon: "play.circle.fill", label: "Video")
-                }
-                .fullScreenCover(item: $playingMedia) { m in MediaPlayerScreen(url: m.url) }
+                InlineVideoView(url: url, fromMe: message.fromMe)
             case "audio":
                 Button { playingMedia = PlayableMedia(url: url) } label: {
                     mediaChip(icon: "waveform", label: "Voice message")
