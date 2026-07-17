@@ -32,6 +32,16 @@ final class EmailStore: ObservableObject {
 
     private static let rest = "https://cchnsizaeoqhgawkyugs.supabase.co/rest/v1"
 
+    /// Tombstones: gmail ids binned from this device. The server worker only
+    /// applies the gmail-side bin + mirror delete on its ~10s poll, so without
+    /// these the next refresh resurrects a just-deleted email "a second later".
+    private static let tombstoneKey = "email.deletedTombstones.v1"
+    private var tombstones: [String: TimeInterval] = {
+        let raw = UserDefaults.standard.dictionary(forKey: tombstoneKey) as? [String: TimeInterval] ?? [:]
+        let cutoff = Date().timeIntervalSince1970 - 24 * 3600
+        return raw.filter { $0.value > cutoff }
+    }()
+
     func refresh() async {
         guard let token = auth?.accessToken else { return }
         var req = URLRequest(url: URL(string:
@@ -49,14 +59,17 @@ final class EmailStore: ObservableObject {
             return fmt.date(from: s) ?? fmtNoFrac.date(from: s) ?? Date()
         }
         if let rows = try? decoder.decode([Email].self, from: data) {
-            emails = rows
+            emails = rows.filter { tombstones[$0.gmailId] == nil }
         }
         loaded = true
     }
 
-    /// Swipe-to-delete: queue a gmail bin server-side, drop locally right away.
+    /// Swipe-to-delete: tombstone first (kills the refresh race), queue the
+    /// gmail bin server-side, drop locally right away.
     func delete(_ email: Email) async {
         guard let token = auth?.accessToken, let userId = auth?.userId else { return }
+        tombstones[email.gmailId] = Date().timeIntervalSince1970
+        UserDefaults.standard.set(tombstones, forKey: Self.tombstoneKey)
         emails.removeAll { $0.id == email.id }
         var req = URLRequest(url: URL(string: "\(Self.rest)/email_actions")!)
         req.httpMethod = "POST"
