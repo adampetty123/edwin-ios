@@ -317,7 +317,7 @@ struct AppearanceSettings: View {
                 }
             } header: {
                 Text("Theme")
-            } footer: { Text("Dark mode is coming in a later update; Edwin follows your device for now.") }
+            } footer: { Text("Match device follows your iPhone's light and dark schedule; light and dark pin Edwin to one look.") }
         }
         .listStyle(.insetGrouped).scrollContentBackground(.hidden).background(Theme.bg)
         .navigationTitle("Appearance").navigationBarTitleDisplayMode(.inline)

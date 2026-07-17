@@ -358,7 +358,7 @@ struct DraftCard: View {
         }
         .padding(12)
         .frame(width: 270, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(.white))
+        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.surface))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.accent.opacity(0.35), lineWidth: 1))
         .shadow(color: .black.opacity(0.05), radius: 8, y: 3)
     }

@@ -1,33 +1,34 @@
 import SwiftUI
 
 /// Edwin design tokens. Monochrome + one violet accent, calm and message-first.
+/// Every color is adaptive: light value by day, dark value after sunset.
 enum Theme {
     // structural
-    static let bg = Color.white
-    static let surface = Color(hex: 0xF7F7F8)
-    static let surfaceAlt = Color(hex: 0xF0F0F2)
-    static let border = Color(hex: 0xEAEAEC)
+    static let bg = Color(light: 0xFFFFFF, dark: 0x000000)
+    static let surface = Color(light: 0xF7F7F8, dark: 0x1C1C1E)
+    static let surfaceAlt = Color(light: 0xF0F0F2, dark: 0x2C2C2E)
+    static let border = Color(light: 0xEAEAEC, dark: 0x38383A)
 
     // text
-    static let text = Color(hex: 0x0B0B0F)
-    static let textMuted = Color(hex: 0x6B6B73)
-    static let textFaint = Color(hex: 0x9A9AA2)
+    static let text = Color(light: 0x0B0B0F, dark: 0xF5F5F7)
+    static let textMuted = Color(light: 0x6B6B73, dark: 0x98989F)
+    static let textFaint = Color(light: 0x9A9AA2, dark: 0x63636B)
 
     // one accent
-    static let accent = Color(hex: 0x5B5BF0)
-    static let accentSoft = Color(hex: 0xEEEEFE)
+    static let accent = Color(light: 0x5B5BF0, dark: 0x8484F7)
+    static let accentSoft = Color(light: 0xEEEEFE, dark: 0x23233C)
 
     // channels (functional wayfinding)
-    static let whatsapp = Color(hex: 0x25D366)
+    static let whatsapp = Color(light: 0x25D366, dark: 0x25D366)
 
     // chat bubbles — iMessage language
-    static let bubbleMe = Color(hex: 0x007AFF)
-    static let bubbleThem = Color(hex: 0xE9E9EB)
-    static let imessage = Color(hex: 0x0A84FF)
+    static let bubbleMe = Color(light: 0x007AFF, dark: 0x0A84FF)
+    static let bubbleThem = Color(light: 0xE9E9EB, dark: 0x2C2C2E)
+    static let imessage = Color(light: 0x0A84FF, dark: 0x0A84FF)
 
     // status
-    static let success = Color(hex: 0x1FB877)
-    static let danger = Color(hex: 0xF0453A)
+    static let success = Color(light: 0x1FB877, dark: 0x30D158)
+    static let danger = Color(light: 0xF0453A, dark: 0xFF6961)
 }
 
 extension Color {
@@ -39,6 +40,20 @@ extension Color {
             blue: Double(hex & 0xFF) / 255,
             opacity: 1
         )
+    }
+
+    /// Adaptive pair: resolves light or dark from the live interface style,
+    /// so it also honors an in-app .preferredColorScheme override.
+    init(light: UInt32, dark: UInt32) {
+        self.init(uiColor: UIColor { traits in
+            let hex = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(
+                red: CGFloat((hex >> 16) & 0xFF) / 255,
+                green: CGFloat((hex >> 8) & 0xFF) / 255,
+                blue: CGFloat(hex & 0xFF) / 255,
+                alpha: 1
+            )
+        })
     }
 }
 

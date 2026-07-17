@@ -87,8 +87,8 @@ struct WelcomeView: View {
                 )
             Spacer()
             HStack(spacing: 8) {
-                channelChip(icon: "message.fill", label: "WhatsApp", color: Theme.whatsapp, bg: Color(hex: 0xE9FBF0))
-                channelChip(icon: "bubble.left.fill", label: "iMessage", color: Theme.imessage, bg: Color(hex: 0xE8F2FF))
+                channelChip(icon: "message.fill", label: "WhatsApp", color: Theme.whatsapp, bg: Color(light: 0xE9FBF0, dark: 0x10311F))
+                channelChip(icon: "bubble.left.fill", label: "iMessage", color: Theme.imessage, bg: Color(light: 0xE8F2FF, dark: 0x10283F))
             }
         }
         .padding(.top, 8)
@@ -181,7 +181,7 @@ struct HeroFlow: View {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(.white)
+                .fill(Theme.surface)
                 .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
         )
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border, lineWidth: 1))

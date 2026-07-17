@@ -7,6 +7,15 @@ struct EdwinApp: App {
     @StateObject private var wa = WAStore()
     @StateObject private var cal = CalendarStore()
     @StateObject private var store = Store()
+    @AppStorage("appearance.mode") private var appearanceMode = "system"
+
+    private var scheme: ColorScheme? {
+        switch appearanceMode {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -17,6 +26,7 @@ struct EdwinApp: App {
                 .environmentObject(store)
                 .tint(Theme.accent)
                 .fontDesign(.rounded)
+                .preferredColorScheme(scheme)
                 .onAppear { wa.auth = auth; cal.auth = auth }
         }
     }

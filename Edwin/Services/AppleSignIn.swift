@@ -24,6 +24,7 @@ enum AppleSignIn {
 /// Drop-in Apple button wired to AuthStore. Owns its nonce per attempt.
 struct AppleSignInButton: View {
     @EnvironmentObject var auth: AuthStore
+    @Environment(\.colorScheme) private var colorScheme
     @Binding var error: String?
     var label: SignInWithAppleButton.Label = .continue
     @State private var nonce = ""
@@ -66,7 +67,7 @@ struct AppleSignInButton: View {
                 }
             }
         }
-        .signInWithAppleButtonStyle(.black)
+        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
         .frame(height: 56)
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 50))
