@@ -164,7 +164,7 @@ struct InboxView: View {
                             NavigationLink(value: chat) { ChatRow(chat: chat, senderAvatar: wa.senderAvatars[chat.lastSenderJid ?? ""]) }
                                 .listRowInsets(EdgeInsets(top: 14, leading: 20, bottom: 14, trailing: 20))
                                 .listRowSeparatorTint(Theme.border)
-                                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     Button(role: .destructive) {
                                         Task { await wa.hideChat(chat) }
                                     } label: { Label("Delete", systemImage: "trash") }
@@ -178,7 +178,7 @@ struct InboxView: View {
                             NavigationLink(value: email) { UnifiedEmailRow(email: email) }
                                 .listRowInsets(EdgeInsets(top: 14, leading: 20, bottom: 14, trailing: 20))
                                 .listRowSeparatorTint(Theme.border)
-                                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     Button(role: .destructive) {
                                         Task { await emailStore.delete(email) }
                                     } label: { Label("Delete", systemImage: "trash") }
