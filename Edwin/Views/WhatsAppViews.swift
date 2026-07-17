@@ -271,6 +271,7 @@ struct ChatView: View {
     @State private var replyingTo: WAMessage?
     @State private var sendState: SendState = .idle
     @State private var openedAtBottom = false
+    @StateObject private var memo = VoiceMemo()
     enum SendState: Equatable { case idle, queued, failed(String) }
 
     private var msgs: [WAMessage] { wa.messages[chat.jid] ?? [] }
@@ -441,21 +442,72 @@ struct ChatView: View {
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(Theme.textMuted)
             }
+            if memo.recording {
+                HStack(spacing: 8) {
+                    Circle().fill(Theme.danger).frame(width: 8, height: 8)
+                    Text("recording \(Int(memo.elapsed))s — tap ■ when you're done")
+                        .font(.system(size: 12.5, design: .rounded))
+                        .foregroundStyle(Theme.textMuted)
+                    Spacer()
+                    Button("cancel") { memo.cancel() }
+                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Theme.textFaint)
+                }
+                .padding(.horizontal, 4)
+            }
+            if let err = memo.error {
+                Text(err)
+                    .font(.system(size: 12.5, design: .rounded))
+                    .foregroundStyle(Theme.danger)
+                    .padding(.horizontal, 4)
+            }
             HStack(alignment: .bottom, spacing: 10) {
-                TextField("Message", text: $draft, axis: .vertical)
+                TextField(memo.recording ? "recording… tap ■ when done" : (memo.transcribing ? "transcribing…" : "Message"),
+                          text: $draft, axis: .vertical)
                     .font(.system(size: 16, design: .rounded))
                     .lineLimit(1...4)
                     .padding(.horizontal, 16).padding(.vertical, 13)
                     .liquidGlassField()
-                Button { send() } label: {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(.white)
+                    .disabled(memo.recording || memo.transcribing)
+                if draft.trimmingCharacters(in: .whitespaces).isEmpty {
+                    // voice: tap to record, tap ■ to transcribe into the draft
+                    // (transcript lands in the field so you can check it before sending)
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        Task {
+                            if memo.recording {
+                                if let transcript = await memo.stopAndTranscribe() {
+                                    draft = transcript
+                                }
+                            } else {
+                                _ = await memo.start()
+                            }
+                        }
+                    } label: {
+                        Group {
+                            if memo.transcribing {
+                                ProgressView().tint(.white)
+                            } else {
+                                Image(systemName: memo.recording ? "stop.fill" : "mic.fill")
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundStyle(.white)
+                            }
+                        }
                         .frame(width: 44, height: 44)
-                        .background(Circle().fill(draft.trimmingCharacters(in: .whitespaces).isEmpty ? Theme.border : Theme.accent))
+                        .background(Circle().fill(memo.recording ? Theme.danger : Theme.bubbleMe))
+                    }
+                    .disabled(memo.transcribing)
+                    .accessibilityLabel(memo.recording ? "Stop recording" : "Record voice message")
+                } else {
+                    Button { send() } label: {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Circle().fill(Theme.accent))
+                    }
+                    .accessibilityLabel("Send")
                 }
-                .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
-                .accessibilityLabel("Send")
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
