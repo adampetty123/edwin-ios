@@ -60,6 +60,30 @@ enum GoogleAuth {
         return (first["email"] as? String) ?? ""
     }
 
+    /// Whether the google account's calendar is used (on by default; owner can remove it).
+    static func calendarEnabled(userId: String, accessToken: String) async -> Bool {
+        var req = URLRequest(url: URL(string:
+            "\(projectURL)/rest/v1/google_accounts?user_id=eq.\(userId)&select=calendar_enabled")!)
+        req.setValue(SupabaseAuthClient.anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        guard let (data, _) = try? await URLSession.shared.data(for: req),
+              let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+              let first = rows.first else { return true }
+        return (first["calendar_enabled"] as? Bool) ?? true
+    }
+
+    static func setCalendarEnabled(_ enabled: Bool, userId: String, accessToken: String) async throws {
+        var req = URLRequest(url: URL(string:
+            "\(projectURL)/rest/v1/google_accounts?user_id=eq.\(userId)")!)
+        req.httpMethod = "PATCH"
+        req.setValue(SupabaseAuthClient.anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("return=minimal", forHTTPHeaderField: "Prefer")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["calendar_enabled": enabled])
+        _ = try await URLSession.shared.data(for: req)
+    }
+
     // MARK: web auth plumbing
 
     @MainActor

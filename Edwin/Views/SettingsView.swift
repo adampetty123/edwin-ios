@@ -140,33 +140,81 @@ struct SettingsView: View {
 struct AccountsSettings: View {
     @EnvironmentObject var auth: AuthStore
     @EnvironmentObject var wa: WAStore
+    @EnvironmentObject var cal: CalendarStore
     @State private var googleEmail: String?
+    @State private var gcalEnabled = true
     @State private var googleBusy = false
     @State private var googleError: String?
     @State private var showWASetup = false
 
     var body: some View {
         List {
-            Section {
+            Section("Messages") {
                 connectionRow(icon: "message.fill", tint: Theme.whatsapp, name: "WhatsApp",
                               subtitle: wa.isConnected ? "Connected" : "Not connected",
                               connected: wa.isConnected, busy: false,
                               actionTitle: wa.isConnected ? "Connected" : "Set up",
                               disabled: wa.isConnected) { showWASetup = true }
-                connectionRow(icon: "envelope.fill", tint: Color(hex: 0xEA4335), name: "Google",
-                              subtitle: googleEmail.map { $0.isEmpty ? "Connected" : $0 } ?? "Gmail + Calendar",
-                              connected: googleEmail != nil, busy: googleBusy,
-                              actionTitle: googleEmail != nil ? "Connected" : "Connect",
-                              disabled: googleEmail != nil) {
+                connectionRow(icon: "bubble.left.fill", tint: Color(hex: 0x34C759), name: "iMessage",
+                              subtitle: "Coming soon",
+                              connected: false, busy: false,
+                              actionTitle: "Soon", disabled: true) {}
+            }
+
+            Section("Email") {
+                if let email = googleEmail {
+                    connectionRow(icon: "envelope.fill", tint: Color(hex: 0xEA4335), name: "Gmail",
+                                  subtitle: email.isEmpty ? "Connected" : email,
+                                  connected: true, busy: false,
+                                  actionTitle: "Connected", disabled: true) {}
+                }
+                addNewRow(busy: googleBusy) {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     connectGoogle()
                 }
             } footer: {
-                if let err = googleError {
-                    Text(err).foregroundStyle(Theme.danger)
-                } else {
-                    Text("Edwin reads these to triage what matters and answer for you. Nothing sends without your ok.")
+                if let err = googleError { Text(err).foregroundStyle(Theme.danger) }
+            }
+
+            Section("Calendar") {
+                if googleEmail != nil && gcalEnabled {
+                    HStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color(hex: 0x4285F4).opacity(0.12))
+                            .frame(width: 40, height: 40)
+                            .overlay(Image(systemName: "calendar").font(.system(size: 17)).foregroundStyle(Color(hex: 0x4285F4)))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Google Calendar").font(.system(size: 16, weight: .semibold, design: .rounded)).foregroundStyle(Theme.text)
+                            Text(googleEmail ?? "").font(.system(size: 13, design: .rounded)).foregroundStyle(Theme.success)
+                        }
+                        Spacer()
+                        Button("Remove") { setCalendar(enabled: false) }
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(Theme.danger)
+                    }
                 }
+                if cal.connected {
+                    connectionRow(icon: "iphone", tint: Color(hex: 0x8E8E93), name: "iPhone Calendars",
+                                  subtitle: "Connected",
+                                  connected: true, busy: false,
+                                  actionTitle: "Connected", disabled: true) {}
+                }
+                Menu {
+                    if googleEmail != nil && !gcalEnabled {
+                        Button("Re-add Google Calendar") { setCalendar(enabled: true) }
+                    }
+                    if googleEmail == nil {
+                        Button("Google Calendar (connect Google)") { connectGoogle() }
+                    }
+                    if !cal.connected {
+                        Button("iPhone Calendars") { Task { await cal.connect() } }
+                    }
+                } label: {
+                    addNewLabel
+                }
+            } footer: {
+                Text("Connecting a Google account uses its calendar by default — remove it here anytime. Edwin reads these to triage what matters and answer for you. Nothing sends without your ok.")
             }
         }
         .listStyle(.insetGrouped)
@@ -182,9 +230,38 @@ struct AccountsSettings: View {
         .task { await refreshGoogle() }
     }
 
+    private var addNewLabel: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Theme.accent.opacity(0.12))
+                .frame(width: 40, height: 40)
+                .overlay(Image(systemName: "plus").font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.accent))
+            Text("Add New").font(.system(size: 16, weight: .semibold, design: .rounded)).foregroundStyle(Theme.accent)
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private func addNewRow(busy: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                addNewLabel
+                if busy { ProgressView() }
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(busy)
+    }
+
+    private func setCalendar(enabled: Bool) {
+        gcalEnabled = enabled
+        Task { try? await GoogleAuth.setCalendarEnabled(enabled, userId: auth.userId, accessToken: auth.accessToken ?? "") }
+    }
+
     private func refreshGoogle() async {
         guard let token = auth.accessToken else { return }
         googleEmail = await GoogleAuth.status(userId: auth.userId, accessToken: token)
+        gcalEnabled = await GoogleAuth.calendarEnabled(userId: auth.userId, accessToken: token)
     }
     private func connectGoogle() {
         guard let token = auth.accessToken, !googleBusy else { return }
