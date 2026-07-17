@@ -10,10 +10,7 @@ struct LoadingView: View {
         ZStack {
             Theme.bg.ignoresSafeArea()
             VStack(spacing: 18) {
-                Image("EdwinAvatar")
-                    .resizable().scaledToFill()
-                    .frame(width: 88, height: 88)
-                    .clipShape(Circle())
+                EdwinIcon(size: 88)
                     .shadow(color: .black.opacity(0.08), radius: 16, y: 6)
                     .scaleEffect(pulse ? 1.05 : 0.95)
                     .animation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: pulse)

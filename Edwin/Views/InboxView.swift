@@ -519,11 +519,7 @@ struct AssistantRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image("EdwinAvatar")
-                .resizable()
-                .scaledToFill()
-                .frame(width: 48, height: 48)
-                .clipShape(Circle())
+            EdwinIcon(size: 48)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text("Edwin").font(.system(size: 16, weight: .bold, design: .rounded))

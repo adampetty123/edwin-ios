@@ -67,10 +67,7 @@ struct AssistantChatView: View {
             // same pfp as the inbox row — Edwin looks like one person everywhere
             ToolbarItem(placement: .principal) {
                 HStack(spacing: 8) {
-                    Image("EdwinAvatar")
-                        .resizable().scaledToFill()
-                        .frame(width: 30, height: 30)
-                        .clipShape(Circle())
+                    EdwinIcon(size: 30)
                     Text("Edwin")
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
                 }

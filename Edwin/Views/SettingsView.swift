@@ -17,6 +17,12 @@ struct SettingsView: View {
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 .listRowBackground(Color.clear)
 
+            Section("Assistant") {
+                NavigationLink { AssistantSettings() } label: {
+                    settingRow(icon: "sparkles", tint: Color(hex: 0x2FD87E), title: "Assistant Settings")
+                }
+            }
+
             Section("User settings") {
                 NavigationLink { AccountsSettings() } label: {
                     settingRow(icon: "person.crop.circle.fill", tint: settingsAccent, title: "Accounts")
@@ -504,5 +510,75 @@ struct CalendarPickerSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - Assistant settings: personalize Edwin, starting with his icon color.
+
+struct AssistantSettings: View {
+    @AppStorage("assistant.iconColor") private var iconColorHex = EdwinIcon.defaultHex
+    @State private var picked: Color = Color(hex: 0x2FD87E)
+
+    private let presets: [UInt32] = [
+        0x2FD87E, 0x0A84FF, 0x5E5CE6, 0xE8519B,
+        0xFF9500, 0xF5B900, 0xFF3B30, 0x1C1C1E,
+    ]
+
+    var body: some View {
+        List {
+            Section {
+                VStack(spacing: 12) {
+                    EdwinIcon(size: 96)
+                        .shadow(color: .black.opacity(0.10), radius: 12, y: 4)
+                    Text("Edwin")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.text)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+            }
+            .listRowBackground(Color.clear)
+
+            Section("Icon color") {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 14) {
+                    ForEach(presets, id: \.self) { hex in
+                        let hexStr = String(format: "%06X", hex)
+                        Button {
+                            iconColorHex = hexStr
+                            picked = Color(hex: hex)
+                        } label: {
+                            Circle()
+                                .fill(Color(hex: hex))
+                                .frame(width: 40, height: 40)
+                                .overlay {
+                                    if iconColorHex.uppercased() == hexStr {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 15, weight: .bold))
+                                            .foregroundStyle(.white)
+                                    }
+                                }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 6)
+
+                ColorPicker("Custom color", selection: $picked, supportsOpacity: false)
+                    .font(.system(size: 15, design: .rounded))
+                    .onChange(of: picked) {
+                        if let hex = picked.hexString { iconColorHex = hex }
+                    }
+
+                Button("Reset to default") {
+                    iconColorHex = EdwinIcon.defaultHex
+                    picked = Color(hexString: EdwinIcon.defaultHex) ?? .green
+                }
+                .font(.system(size: 15, design: .rounded))
+            }
+        }
+        .background(Theme.bg)
+        .navigationTitle("Assistant Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear { picked = Color(hexString: iconColorHex) ?? Color(hex: 0x2FD87E) }
     }
 }

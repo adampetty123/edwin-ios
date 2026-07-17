@@ -84,3 +84,62 @@ extension View {
         }
     }
 }
+
+// MARK: - Edwin's icon, drawn natively so its color is user-editable
+// (Settings > Assistant > Assistant Settings). Mirrors the original asset:
+// two pill eyes with dark pupils + glints on a colored square-ish field.
+
+extension Color {
+    /// "RRGGBB" → Color (nil on garbage input).
+    init?(hexString: String) {
+        let s = hexString.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
+        guard s.count == 6, let v = UInt32(s, radix: 16) else { return nil }
+        self.init(hex: v)
+    }
+
+    /// Color → "RRGGBB" for persistence.
+    var hexString: String? {
+        guard let c = UIColor(self).cgColor.converted(to: CGColorSpace(name: CGColorSpace.sRGB)!, intent: .defaultIntent, options: nil)?.components, c.count >= 3 else { return nil }
+        let r = Int(round(c[0] * 255)), g = Int(round(c[1] * 255)), b = Int(round(c[2] * 255))
+        return String(format: "%02X%02X%02X", r, g, b)
+    }
+}
+
+struct EdwinIcon: View {
+    var size: CGFloat = 48
+    @AppStorage("assistant.iconColor") private var iconColorHex = EdwinIcon.defaultHex
+
+    static let defaultHex = "2FD87E"   // the original green
+
+    var body: some View {
+        ZStack {
+            Circle().fill(Color(hexString: iconColorHex) ?? Color(hex: 0x2FD87E))
+            HStack(spacing: size * 0.09) {
+                eye
+                eye
+            }
+            .offset(y: -size * 0.01)
+        }
+        .frame(width: size, height: size)
+    }
+
+    private var eye: some View {
+        let w = size * 0.26
+        let h = size * 0.60
+        return RoundedRectangle(cornerRadius: w / 2, style: .continuous)
+            .fill(Color(hex: 0xFCE9F1))
+            .frame(width: w, height: h)
+            .overlay(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: w * 0.30, style: .continuous)
+                    .fill(Color(hex: 0x532040))
+                    .frame(width: w * 0.64, height: h * 0.56)
+                    .overlay(alignment: .topTrailing) {
+                        Circle()
+                            .fill(.white)
+                            .frame(width: w * 0.20, height: w * 0.20)
+                            .padding(w * 0.10)
+                    }
+                    .padding(.bottom, h * 0.10)
+            }
+    }
+}
