@@ -81,7 +81,14 @@ struct InboxView: View {
             .background(Theme.bg)
             .navigationTitle("All Chats")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $search, prompt: "Search chats, messages and email")
+            // placement pinned on purpose: with the default (collapsing) drawer on
+            // iOS 26, the collapsed search container keeps an invisible hit area
+            // over the first list row, so the top chat swallowed taps. an
+            // always-visible drawer gives the list a correct top inset and the
+            // search field's hit area matches what's on screen.
+            .searchable(text: $search,
+                        placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: "Search chats, messages and email")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
