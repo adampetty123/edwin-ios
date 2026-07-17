@@ -76,6 +76,8 @@ struct MainTabView: View {
         }
         .task {
             // app-wide background work (used to live on the Messages tab)
+            LocationStore.shared.auth = auth
+            LocationStore.shared.refresh()
             emailStore.auth = auth
             await wa.ensureAssistant()
             await wa.refreshChats()

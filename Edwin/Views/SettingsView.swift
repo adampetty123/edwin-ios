@@ -593,6 +593,8 @@ struct CalendarPickerSheet: View {
 // MARK: - Assistant settings: personalize Edwin, starting with his icon color.
 
 struct AssistantSettings: View {
+    @EnvironmentObject var auth: AuthStore
+    @ObservedObject private var loc = LocationStore.shared
     @AppStorage("assistant.iconColor") private var iconColorHex = EdwinIcon.defaultHex
     @State private var picked: Color = Color(hex: 0x2FD87E)
 
@@ -615,6 +617,20 @@ struct AssistantSettings: View {
                 .padding(.vertical, 10)
             }
             .listRowBackground(Color.clear)
+
+            Section {
+                Toggle("Share location with Edwin", isOn: Binding(
+                    get: { loc.enabled },
+                    set: { on in
+                        loc.enabled = on
+                        if on { loc.auth = auth; loc.refresh() } else { loc.clear() }
+                    }))
+                    .font(.system(size: 15, design: .rounded))
+            } footer: {
+                Text(loc.enabled
+                     ? "Edwin knows your rough area (\(loc.lastPlace ?? "updating…")) — refreshed when you open the app, never tracked in the background."
+                     : "Off — Edwin doesn't know where you are. Turning this on lets him factor in where you are when helping with plans.")
+            }
 
             Section("Icon color") {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 14) {
