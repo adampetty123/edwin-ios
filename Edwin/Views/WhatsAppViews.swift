@@ -270,6 +270,7 @@ struct ChatView: View {
     @State private var draft = ""
     @State private var replyingTo: WAMessage?
     @State private var sendState: SendState = .idle
+    @State private var openedAtBottom = false
     enum SendState: Equatable { case idle, queued, failed(String) }
 
     private var msgs: [WAMessage] { wa.messages[chat.jid] ?? [] }
@@ -304,8 +305,16 @@ struct ChatView: View {
             }
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
+            .onAppear {
+                // cached messages: count never "changes" on open, so jump here too
+                if !openedAtBottom { openAtLatest(proxy) }
+            }
             .onChange(of: msgs.count) {
-                if let last = msgs.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
+                if !openedAtBottom {
+                    openAtLatest(proxy)
+                } else if let last = msgs.last {
+                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                }
                 // messages that arrive while the chat is open are read too
                 Task { await wa.markRead(chatJid: chat.jid) }
             }
@@ -337,6 +346,22 @@ struct ChatView: View {
             while !Task.isCancelled {
                 await wa.refreshMessages(chatJid: chat.jid)
                 try? await Task.sleep(nanoseconds: wa.realtime.connected ? 15_000_000_000 : 3_000_000_000)
+            }
+        }
+    }
+
+    /// Open the chat pinned to the newest message — never to the first unread.
+    /// Lazy rows and media size in after first layout and drift the offset
+    /// (this is what dropped you mid-chat at your last read position), so we
+    /// re-pin a couple of times right after opening. No animation: the chat
+    /// should just BE at the bottom.
+    private func openAtLatest(_ proxy: ScrollViewProxy) {
+        guard let last = msgs.last else { return }
+        openedAtBottom = true
+        proxy.scrollTo(last.id, anchor: .bottom)
+        for delay in [0.05, 0.3] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                proxy.scrollTo(last.id, anchor: .bottom)
             }
         }
     }
