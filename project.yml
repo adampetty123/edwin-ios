@@ -31,6 +31,7 @@ targets:
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_ENTITLEMENTS: Edwin/Edwin.entitlements
         PROVISIONING_PROFILE_SPECIFIER: "Iris App Store"
+        "PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]": "Iris Mac Catalyst"
         CODE_SIGN_IDENTITY: "Apple Distribution"
         TARGETED_DEVICE_FAMILY: "1"
         "TARGETED_DEVICE_FAMILY[sdk=macosx*]": "2"
@@ -68,6 +69,7 @@ targets:
         DEVELOPMENT_TEAM: Z3FSAXK2G4
         CODE_SIGN_STYLE: Manual
         PROVISIONING_PROFILE_SPECIFIER: "Iris NSE App Store"
+        "PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]": "Iris Mac Catalyst NSE"
         CODE_SIGN_IDENTITY: "Apple Distribution"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"

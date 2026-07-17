@@ -133,3 +133,94 @@ jobs:
             -destination 'generic/platform=macOS,variant=Mac Catalyst' \
             CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
             | tail -30
+
+  # Real Mac release: Catalyst archive signed for App Store Connect →
+  # TestFlight (macOS). Runs only on manual dispatch so it can't eat the
+  # daily upload quota on every push.
+  mac-release:
+    runs-on: macos-26
+    timeout-minutes: 60
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 26
+        run: |
+          LATEST=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$LATEST" ]; then sudo xcode-select -s "$LATEST"; fi
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Bump build number
+        run: |
+          BUILD_NUM=$(date +%s)
+          sed -i '' "s/CURRENT_PROJECT_VERSION: \"1\"/CURRENT_PROJECT_VERSION: \"$BUILD_NUM\"/" project.yml
+          echo "build number: $BUILD_NUM"
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Import signing certificates
+        env:
+          P12_B64: ${{ secrets.MAC_P12_B64 }}
+          P12_PASSWORD: ${{ secrets.MAC_P12_PASSWORD }}
+        run: |
+          KEYCHAIN=build.keychain
+          KEYCHAIN_PASS=ci-temp-pass
+          echo "$P12_B64" | base64 --decode > dist.p12
+          security create-keychain -p "$KEYCHAIN_PASS" $KEYCHAIN
+          security default-keychain -s $KEYCHAIN
+          security unlock-keychain -p "$KEYCHAIN_PASS" $KEYCHAIN
+          security set-keychain-settings -t 3600 -u $KEYCHAIN
+          security import dist.p12 -k $KEYCHAIN -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASS" $KEYCHAIN
+          rm dist.p12
+      - name: Install provisioning profiles
+        env:
+          MAC_PROFILE_B64: ${{ secrets.MAC_PROFILE_B64 }}
+          MAC_PROFILE_NSE_B64: ${{ secrets.MAC_PROFILE_NSE_B64 }}
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          for var in MAC_PROFILE_B64 MAC_PROFILE_NSE_B64; do
+            echo "${!var}" | base64 --decode > profile.provisionprofile
+            UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin <<< "$(security cms -D -i profile.provisionprofile)")
+            cp profile.provisionprofile ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.provisionprofile
+            echo "installed profile $UUID"
+          done
+      - name: Archive (Mac Catalyst)
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project Edwin.xcodeproj \
+            -scheme Edwin \
+            -configuration Release \
+            -destination 'generic/platform=macOS,variant=Mac Catalyst' \
+            -archivePath build/EdwinMac.xcarchive \
+            | tail -20
+      - name: Export pkg
+        run: |
+          set -o pipefail
+          cat > ExportOptionsMac.plist << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key><dict>
+              <key>com.flowjam.iris</key><string>Iris Mac Catalyst</string>
+              <key>com.flowjam.iris.NotificationService</key><string>Iris Mac Catalyst NSE</string>
+            </dict>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath build/EdwinMac.xcarchive \
+            -exportOptionsPlist ExportOptionsMac.plist \
+            -exportPath build/mac-export \
+            | tail -20
+      - name: Upload to TestFlight (macOS)
+        env:
+          ASC_KEY_B64: ${{ secrets.ASC_KEY_B64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$ASC_KEY_B64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8
+          PKG=$(ls build/mac-export/*.pkg | head -1)
+          xcrun altool --upload-app -f "$PKG" --type macos \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
