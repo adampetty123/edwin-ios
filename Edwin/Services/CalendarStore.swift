@@ -121,6 +121,7 @@ final class CalendarStore: ObservableObject {
             ev.isAllDay = row.all_day ?? false
             ev.location = row.location
             ev.calendar = store.defaultCalendarForNewEvents
+            if let rule = row.recurrence?.ekRule { ev.addRecurrenceRule(rule) }
             do {
                 try store.save(ev, span: .thisEvent)
                 addedAny = true
@@ -131,6 +132,14 @@ final class CalendarStore: ObservableObject {
             }
         }
         if addedAny { await sync() }
+    }
+
+    static func parseISODate(_ s: String) -> Date? {
+        // bare dates like "2026-09-01" (recurrence until)
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone.current
+        return f.date(from: String(s.prefix(10)))
     }
 
     static func parseISO(_ s: String) -> Date? {
@@ -211,11 +220,47 @@ enum CalendarSync {
         let ends_at: String?
         let all_day: Bool?
         let location: String?
+        let recurrence: Recurrence?
+    }
+
+    /// Edwin-queued recurrence: {freq, interval, days?, until?, count?}
+    struct Recurrence: Codable {
+        let freq: String
+        let interval: Int?
+        let days: [String]?
+        let until: String?
+        let count: Int?
+
+        var ekRule: EKRecurrenceRule? {
+            let f: EKRecurrenceFrequency
+            switch freq {
+            case "daily": f = .daily
+            case "weekly": f = .weekly
+            case "monthly": f = .monthly
+            case "yearly": f = .yearly
+            default: return nil
+            }
+            let dayMap: [String: EKWeekday] = [
+                "monday": .monday, "tuesday": .tuesday, "wednesday": .wednesday,
+                "thursday": .thursday, "friday": .friday, "saturday": .saturday, "sunday": .sunday,
+            ]
+            let dows = (days ?? []).compactMap { dayMap[$0.lowercased()] }.map { EKRecurrenceDayOfWeek($0) }
+            var end: EKRecurrenceEnd? = nil
+            if let until, let d = CalendarStore.parseISO(until) ?? CalendarStore.parseISODate(until) {
+                end = EKRecurrenceEnd(end: d)
+            } else if let count, count > 0 {
+                end = EKRecurrenceEnd(occurrenceCount: count)
+            }
+            return EKRecurrenceRule(recurrenceWith: f, interval: max(1, interval ?? 1),
+                                    daysOfTheWeek: dows.isEmpty ? nil : dows,
+                                    daysOfTheMonth: nil, monthsOfTheYear: nil, weeksOfTheYear: nil,
+                                    daysOfTheYear: nil, setPositions: nil, end: end)
+        }
     }
 
     /// Events Edwin queued for the device calendar.
     static func pendingEvents(userId: String, token: String) async throws -> [PendingEvent] {
-        var r = URLRequest(url: URL(string: rest + "/assistant_calendar_pending?user_id=eq.\(userId)&status=eq.pending&select=id,title,starts_at,ends_at,all_day,location&order=id.asc&limit=20")!)
+        var r = URLRequest(url: URL(string: rest + "/assistant_calendar_pending?user_id=eq.\(userId)&status=eq.pending&select=id,title,starts_at,ends_at,all_day,location,recurrence&order=id.asc&limit=20")!)
         r.setValue(SupabaseAuthClient.anonKey, forHTTPHeaderField: "apikey")
         r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let (data, resp) = try await URLSession.shared.data(for: r)
