@@ -27,8 +27,8 @@ struct SettingsView: View {
                 NavigationLink { AccountsSettings() } label: {
                     settingRow(icon: "person.crop.circle.fill", tint: settingsAccent, title: "Accounts")
                 }
-                NavigationLink { IntegrationsSettings() } label: {
-                    settingRow(icon: "square.grid.2x2.fill", tint: Color(hex: 0xE8519B), title: "Integrations")
+                NavigationLink { BillingSettings() } label: {
+                    settingRow(icon: "creditcard.fill", tint: Color(hex: 0xE8519B), title: "Billing")
                 }
             }
 
@@ -223,9 +223,9 @@ func connectionRow(icon: String, tint: Color, name: String, subtitle: String, co
     }
 }
 
-// MARK: - Integrations (Edwin Pro + behaviour)
+// MARK: - Billing (Edwin Pro + behaviour)
 
-struct IntegrationsSettings: View {
+struct BillingSettings: View {
     @EnvironmentObject var storeKit: Store
     @State private var showPaywall = false
 
@@ -264,7 +264,7 @@ struct IntegrationsSettings: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Theme.bg)
-        .navigationTitle("Integrations")
+        .navigationTitle("Billing")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showPaywall) { PaywallView(onClose: { showPaywall = false }) }
     }
