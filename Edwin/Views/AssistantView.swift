@@ -97,9 +97,13 @@ struct AssistantChatView: View {
         }
     }
 
+    // first message, new day, or after a >1h gap — same iMessage-style stamping
+    // as the WhatsApp chat threads.
     private func showDay(at i: Int) -> Bool {
         guard i > 0 else { return true }
-        return !Calendar.current.isDate(msgs[i].ts, inSameDayAs: msgs[i - 1].ts)
+        let prev = msgs[i - 1].ts, cur = msgs[i].ts
+        if !Calendar.current.isDate(cur, inSameDayAs: prev) { return true }
+        return cur.timeIntervalSince(prev) > 3600
     }
 
     private var composer: some View {

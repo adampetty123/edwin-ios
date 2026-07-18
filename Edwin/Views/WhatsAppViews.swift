@@ -281,7 +281,7 @@ struct ChatView: View {
             ScrollView {
                 LazyVStack(spacing: 4) {
                     ForEach(Array(msgs.enumerated()), id: \.element.id) { i, m in
-                        if showDay(at: i) {
+                        if showTimeStamp(at: i) {
                             DaySeparator(date: m.ts)
                         }
                         MessageBubble(
@@ -367,9 +367,14 @@ struct ChatView: View {
         }
     }
 
-    private func showDay(at i: Int) -> Bool {
+    // iMessage-style timestamp: first message, any new day, or after a gap of
+    // more than an hour since the previous message. Keeps runs of quick messages
+    // clean while stamping when the conversation resumes.
+    private func showTimeStamp(at i: Int) -> Bool {
         guard i > 0 else { return true }
-        return !Calendar.current.isDate(msgs[i].ts, inSameDayAs: msgs[i - 1].ts)
+        let prev = msgs[i - 1].ts, cur = msgs[i].ts
+        if !Calendar.current.isDate(cur, inSameDayAs: prev) { return true }
+        return cur.timeIntervalSince(prev) > 3600
     }
 
     /// First message of a same-sender run (or after a day break) carries the
@@ -709,19 +714,33 @@ struct DaySeparator: View {
     let date: Date
 
     var body: some View {
-        Text(label)
-            .font(.system(size: 12, weight: .semibold, design: .rounded))
+        // bold the day part, keep the time lighter — "Yesterday 22:20",
+        // "Sat 11 July at 11:16" — matching iMessage's inline stamps.
+        (Text(dayLabel).fontWeight(.semibold) + Text(timeLabel))
+            .font(.system(size: 12, design: .rounded))
             .foregroundStyle(Theme.textMuted)
             .padding(.horizontal, 12).padding(.vertical, 4)
             .background(Capsule().fill(Theme.surface))
             .padding(.vertical, 8)
     }
 
-    private var label: String {
+    private var time: String { date.formatted(date: .omitted, time: .shortened) }
+
+    private var dayLabel: String {
         let cal = Calendar.current
         if cal.isDateInToday(date) { return "Today" }
         if cal.isDateInYesterday(date) { return "Yesterday" }
-        return date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
+        let sameYear = cal.component(.year, from: date) == cal.component(.year, from: Date())
+        return sameYear
+            ? date.formatted(.dateTime.weekday(.abbreviated).day().month(.wide))
+            : date.formatted(.dateTime.weekday(.abbreviated).day().month(.wide).year())
+    }
+
+    // today/yesterday read "Yesterday 22:20"; dated stamps read "Sat 11 July at 11:16"
+    private var timeLabel: String {
+        let cal = Calendar.current
+        let dated = !cal.isDateInToday(date) && !cal.isDateInYesterday(date)
+        return (dated ? " at " : " ") + time
     }
 }
 
