@@ -161,7 +161,7 @@ struct AccountsSettings: View {
                               actionTitle: "Soon", disabled: true) {}
             }
 
-            Section("Email") {
+            Section {
                 if let email = googleEmail {
                     connectionRow(icon: "envelope.fill", tint: Color(hex: 0xEA4335), name: "Gmail",
                                   subtitle: email.isEmpty ? "Connected" : email,
@@ -172,11 +172,13 @@ struct AccountsSettings: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     connectGoogle()
                 }
+            } header: {
+                Text("Email")
             } footer: {
                 if let err = googleError { Text(err).foregroundStyle(Theme.danger) }
             }
 
-            Section("Calendar") {
+            Section {
                 if googleEmail != nil && gcalEnabled {
                     HStack(spacing: 12) {
                         RoundedRectangle(cornerRadius: 10)
@@ -213,6 +215,8 @@ struct AccountsSettings: View {
                 } label: {
                     addNewLabel
                 }
+            } header: {
+                Text("Calendar")
             } footer: {
                 Text("Connecting a Google account uses its calendar by default — remove it here anytime. Edwin reads these to triage what matters and answer for you. Nothing sends without your ok.")
             }
