@@ -177,6 +177,13 @@ final class WAStore: ObservableObject {
                                            quotedText: quotedText, quotedSender: quotedSender, token: token)
     }
 
+    /// Fire-and-forget: tell the bridge to warm Edwin's cached prefix on app open.
+    /// Debounced server-side; safe to call on every foreground.
+    func prewarmEdwin() {
+        guard let token, let userId = auth?.userId, !userId.isEmpty else { return }
+        Task { try? await WAClient.prewarmAssistant(userId: userId, token: token) }
+    }
+
     func refreshDrafts() async {
         guard let token else { return }
         if let d = try? await WAClient.drafts(token: token), d != drafts { drafts = d }

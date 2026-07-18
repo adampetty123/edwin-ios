@@ -7,6 +7,7 @@ struct MainTabView: View {
     @EnvironmentObject var auth: AuthStore
     @EnvironmentObject var wa: WAStore
     @EnvironmentObject var cal: CalendarStore
+    @Environment(\.scenePhase) private var scenePhase
 
     /// One typed path for every push — mixing isPresented-bindings with
     /// value pushes on the same stack causes the "opens then bounces back"
@@ -65,6 +66,9 @@ struct MainTabView: View {
             }
         }
         .environmentObject(emailStore)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { wa.prewarmEdwin() }   // returning to the app warms Edwin's cache
+        }
         .onChange(of: router.pendingChatJid) { openPendingChat() }
         .onChange(of: wa.chats.count) {
             // chats can land after the tap (cold launch) — retry then
@@ -79,6 +83,7 @@ struct MainTabView: View {
             LocationStore.shared.auth = auth
             LocationStore.shared.refresh()
             emailStore.auth = auth
+            wa.prewarmEdwin()   // warm Edwin's cached prefix so the first reply is instant
             await wa.ensureAssistant()
             await wa.refreshChats()
             PushManager.shared.enable()

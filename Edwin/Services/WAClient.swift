@@ -241,6 +241,14 @@ enum WAClient {
     }
 
     /// Owner speaks to Edwin: echo their message instantly, then queue the job.
+    /// App-open cache prewarm: drops a __prewarm__ marker in wa_outbox that the
+    /// bridge intercepts to warm this user's cached prefix (never shown in chat).
+    static func prewarmAssistant(userId: String, token: String) async throws {
+        _ = try await request("POST", "/wa_outbox", token: token,
+            body: [["user_id": userId, "chat_jid": assistantJid, "text": "__prewarm__", "kind": "assistant"]],
+            prefer: "return=minimal")
+    }
+
     static func sendToAssistant(userId: String, text: String, mediaUrl: String? = nil, mediaType: String? = nil,
                                 quotedText: String? = nil, quotedSender: String? = nil, token: String) async throws {
         let mid = "user-\(Int(Date().timeIntervalSince1970 * 1000))"
